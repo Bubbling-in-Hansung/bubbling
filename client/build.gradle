@@ -1,0 +1,33 @@
+plugins {
+    id 'application'
+}
+
+group = 'me.returns'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+dependencies {
+    implementation project(':common')
+    implementation 'com.formdev:flatlaf:3.6.1'
+
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+application {
+    mainClass = 'me.returns.bubbling.client.ClientApplication'
+}
+
+test {
+    useJUnitPlatform()
+}

@@ -1,0 +1,5 @@
+rootProject.name = 'bubbling'
+
+include 'common'
+include 'server'
+include 'client'
