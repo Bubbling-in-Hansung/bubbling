@@ -4,5 +4,5 @@ import bubbling.common.enums.BubbleStatus;
 
 public record BubbleRemovedEvent(
         String bubbleId,
-        BubbleStatus finalStatus
+        BubbleStatus status
 ) {}

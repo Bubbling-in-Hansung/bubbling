@@ -4,6 +4,5 @@ public enum ChatRequestStatus {
     PENDING,
     ACCEPTED,
     REJECTED,
-    CANCELLED,
-    EXPIRED
+    CANCELLED
 }

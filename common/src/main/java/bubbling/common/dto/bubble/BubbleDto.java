@@ -1,15 +1,19 @@
 package bubbling.common.dto.bubble;
 
 import bubbling.common.enums.BubbleCategory;
+import bubbling.common.enums.BubbleMethod;
 import bubbling.common.enums.BubbleStatus;
-
-import java.time.LocalDateTime;
 
 public record BubbleDto(
         String id,
         String title,
         BubbleCategory category,
+        BubbleMethod method,
+        int maxMemberCnt,
+        int currentMemberCnt,
+        boolean isOpen,
         BubbleStatus status,
         int reactionCount,
-        LocalDateTime expiredAt
+        String createdAt,
+        String expiresAt
 ) {}

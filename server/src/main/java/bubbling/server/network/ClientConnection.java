@@ -2,22 +2,22 @@ package bubbling.server.network;
 
 import bubbling.common.codec.JsonCodec;
 import bubbling.common.protocol.MessageEnvelope;
+import bubbling.server.domain.User;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
+import java.io.*;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ClientConnection implements Runnable {
 
     private final String id = UUID.randomUUID().toString();
-
     private final Socket socket;
+
+    private volatile User user;
+
     private final ClientRegistry clientRegistry;
     private final MessageDispatcher messageDispatcher;
 
@@ -39,11 +39,17 @@ public class ClientConnection implements Runnable {
         this.messageDispatcher = messageDispatcher;
 
         this.reader = new BufferedReader(
-                new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8)
+                new InputStreamReader(
+                        socket.getInputStream(),
+                        StandardCharsets.UTF_8
+                )
         );
 
         this.writer = new BufferedWriter(
-                new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)
+                new OutputStreamWriter(
+                        socket.getOutputStream(),
+                        StandardCharsets.UTF_8
+                )
         );
     }
 
@@ -51,6 +57,7 @@ public class ClientConnection implements Runnable {
     public void run() {
         try {
             String line;
+
             while (!closed.get() && (line = reader.readLine()) != null) {
                 MessageEnvelope message = jsonCodec.decode(line);
 
@@ -60,16 +67,21 @@ public class ClientConnection implements Runnable {
 
                 messageDispatcher.dispatch(this, message);
             }
-        } catch (IOException | IllegalArgumentException e) {
-            if (!closed.get()) {
-                System.err.println("클라이언트 통신 오류 [" + id + "]: " + e.getMessage());
-            }
+
+        } catch (IOException e) {
+
+        } catch (IllegalArgumentException e) {
+
+        } catch (RuntimeException e) {
+
         } finally {
             close();
         }
     }
 
     void send(MessageEnvelope message) {
+        Objects.requireNonNull(message, "메시지는 필수입니다.");
+
         if (closed.get()) {
             return;
         }
@@ -78,16 +90,43 @@ public class ClientConnection implements Runnable {
             if (closed.get()) {
                 return;
             }
-
             try {
                 writer.write(jsonCodec.encode(message));
                 writer.newLine();
                 writer.flush();
+
             } catch (IOException e) {
-                System.err.println("메시지 전송 실패 [" + id + "]: " + e.getMessage());
                 close();
             }
         }
+    }
+
+    public synchronized void authenticate(User user) {
+        Objects.requireNonNull(user, "사용자는 필수입니다.");
+
+        if (closed.get()) {
+            throw new IllegalStateException("이미 종료된 연결입니다.");
+        }
+
+        if (this.user != null) {
+            throw new IllegalStateException("이미 로그인된 연결입니다.");
+        }
+
+        this.user = user;
+    }
+
+    public User requireAuthenticatedUser() {
+        if (closed.get()) {
+            throw new IllegalStateException("이미 종료된 연결입니다.");
+        }
+
+        User authenticatedUser = this.user;
+
+        if (authenticatedUser == null) {
+            throw new IllegalStateException("로그인이 필요합니다.");
+        }
+
+        return authenticatedUser;
     }
 
     public void close() {
@@ -97,15 +136,23 @@ public class ClientConnection implements Runnable {
 
         try {
             socket.close();
-        } catch (IOException ignored) {
 
+        } catch (IOException e) {
+        } finally {
+            clientRegistry.unregister(this);
         }
-
-        clientRegistry.unregister(this);
     }
 
     public String getId() {
         return id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public boolean isAuthenticated() {
+        return user != null && !closed.get();
     }
 
     public boolean isClosed() {
