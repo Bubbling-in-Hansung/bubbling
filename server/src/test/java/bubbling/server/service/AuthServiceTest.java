@@ -1,9 +1,7 @@
-package bubbling.server.handler;
+package bubbling.server.service;
 
 import bubbling.server.domain.User;
 import bubbling.server.security.PasswordService;
-import bubbling.server.service.AuthService;
-import bubbling.server.service.UserService;
 import bubbling.server.store.UserStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -13,7 +11,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class AuthHandlerTest {
+class AuthServiceTest {
 
     private AuthService authService;
 
