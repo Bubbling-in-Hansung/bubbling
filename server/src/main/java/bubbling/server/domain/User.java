@@ -42,6 +42,19 @@ public class User {
         }
     }
 
+    public static void validatePassword(String originalPassword) {
+        Objects.requireNonNull(originalPassword);
+        if (originalPassword.length() < 8 || originalPassword.length() > 64) {
+            throw new IllegalArgumentException("비밀번호는 8~64자여야 합니다.");
+        }
+
+        for (int i = 0; i < originalPassword.length(); i++) {
+            if (originalPassword.charAt(i) > 127) {
+                throw new IllegalArgumentException("비밀번호에는 1바이트를 초과하는 문자를 사용할 수 없습니다.");
+            }
+        }
+    }
+
     public String getId() {
         return id;
     }

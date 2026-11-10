@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
@@ -15,15 +16,21 @@ public class TcpServer {
     private final int maxClients;
 
     private final ClientRegistry clientRegistry;
-    private final MessageSender messageSender;
     private final MessageDispatcher messageDispatcher;
+
     private final ExecutorService executorService;
     private final AtomicBoolean running = new AtomicBoolean(false);
+
     private volatile ServerSocket serverSocket;
 
-    public TcpServer(int port, int maxClients) {
+    public TcpServer(
+            int port,
+            int maxClients,
+            ClientRegistry clientRegistry,
+            MessageDispatcher messageDispatcher
+    ) {
         if (port < 1 || port > 65535) {
-            throw new IllegalArgumentException("잘못된 포트 번호");
+            throw new IllegalArgumentException("잘못된 포트 번호입니다.");
         }
 
         if (maxClients < 1) {
@@ -33,9 +40,15 @@ public class TcpServer {
         this.port = port;
         this.maxClients = maxClients;
 
-        this.clientRegistry = new ClientRegistry();
-        this.messageSender = new MessageSender(clientRegistry);
-        this.messageDispatcher = new MessageDispatcher(messageSender);
+        this.clientRegistry = Objects.requireNonNull(
+                clientRegistry,
+                "ClientRegistry는 필수입니다."
+        );
+
+        this.messageDispatcher = Objects.requireNonNull(
+                messageDispatcher,
+                "MessageDispatcher는 필수입니다."
+        );
 
         this.executorService = Executors.newFixedThreadPool(maxClients);
     }

@@ -11,7 +11,9 @@ public class ServerBootstrap {
 
         TcpServer server = new TcpServer(
                 config.getPort(),
-                config.getMaxClients()
+                config.getMaxClients(),
+                component.getClientRegistry(),
+                component.getMessageDispatcher()
         );
 
         Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
