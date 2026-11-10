@@ -25,9 +25,11 @@ dependencies {
 }
 
 application {
-    mainClass = 'me.returns.bubbling.client.ClientApplication'
+    mainClass = 'bubbling.client.ClientApplication'
 }
 
 test {
     useJUnitPlatform()
+    // TcpConsoleTest는 JUnit 테스트가 아닌 수동 콘솔 main() 테스트이므로 자동 테스트 스캔에서 제외
+    exclude '**/TcpConsoleTest.class'
 }

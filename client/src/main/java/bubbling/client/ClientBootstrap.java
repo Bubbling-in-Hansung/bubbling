@@ -1,3 +1,5 @@
+package bubbling.client;
+
 import bubbling.client.config.ClientConfig;
 import bubbling.client.network.ClientMessageDispatcher;
 import bubbling.client.network.TcpClient;
