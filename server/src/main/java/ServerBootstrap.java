@@ -16,7 +16,10 @@ public class ServerBootstrap {
                 component.getMessageDispatcher()
         );
 
-        Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            component.stopSchedulers();
+            server.stop();
+        }));
 
         server.start();
     }

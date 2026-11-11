@@ -6,30 +6,38 @@ import java.util.UUID;
 
 public class ChatMessage {
     private final String id = UUID.randomUUID().toString();
+    private final ChatRoom chatRoom;
     private final ChatMember chatMember;
     private final String message;
     private final LocalDateTime createdAt=  LocalDateTime.now();
 
-    private ChatMessage(ChatMember chatMember, String message) {
+    private ChatMessage(ChatRoom chatRoom, ChatMember chatMember, String message) {
+        this.chatRoom = chatRoom;
         this.chatMember = chatMember;
         this.message = message;
     }
 
-    public static ChatMessage create(ChatMember chatMember, String message) {
+    public static ChatMessage create(ChatRoom chatRoom, ChatMember chatMember, String message) {
         Objects.requireNonNull(chatMember, "채팅 멤버는 필수입니다.");
         validateMessage(message);
-        return new ChatMessage(chatMember, message);
+        return new ChatMessage(chatRoom, chatMember, message);
     }
 
-    private static void validateMessage(String message) {
+    public static void validateMessage(String message) {
         Objects.requireNonNull(message, "메세지는 필수입니다.");
         if(message.isEmpty()) {
             throw new IllegalArgumentException("메세지는 비어있을 수 없습니다.");
+        } else if(message.length() > 1000) {
+            throw new IllegalArgumentException("메세지는 1000자 이내로 작성해야 합니다.");
         }
     }
 
     public String getId() {
         return id;
+    }
+
+    public ChatRoom getChatRoom() {
+        return chatRoom;
     }
 
     public ChatMember getChatMember() {

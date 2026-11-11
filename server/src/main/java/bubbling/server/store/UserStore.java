@@ -14,11 +14,11 @@ public class UserStore {
     public User save(User user) {
         Objects.requireNonNull(user, "사용자는 필수입니다.");
 
-        User check = users.putIfAbsent(user.getLoginId(), user);
-
-        if (check != null) {
-            throw new IllegalArgumentException("이미 사용 중인 아이디입니다.");
+        if (findByLoginId(user.getLoginId()).isPresent()) {
+            throw new IllegalArgumentException("이미 사용 중인 로그인 아이디입니다.");
         }
+
+        users.put(user.getId(), user);
 
         return user;
     }

@@ -41,14 +41,35 @@ public class Bubble {
         return new Bubble(owner, title, category, method, maxMemberCnt, isOpen, expireMinute);
     }
 
+    public synchronized void update(String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen) {
+        validateAlive();
+        validateTitle(title);
+        validateMaxMemberCnt(maxMemberCnt);
+        Objects.requireNonNull(category, "카테고리는 필수입니다.");
+        Objects.requireNonNull(method, "대화 방식은 필수입니다.");
+
+        this.title = title;
+        this.category = category;
+        this.method = method;
+        this.maxMemberCnt = maxMemberCnt;
+        this.isOpen = isOpen;
+    }
+
     public synchronized void react() {
         validateAlive();
         this.reactionCnt++;
     }
 
-    public synchronized void expire() {
-        validateAlive();
+    public synchronized boolean expireIfElapsed(LocalDateTime now) {
+        if(status != BubbleStatus.ALIVE) {
+            return false;
+        }
+        if(expiresAt.isAfter(now)) {
+            return false;
+        }
+
         this.status = BubbleStatus.EXPIRED;
+        return true;
     }
 
     private static void validateExpireMinute(int expireMinute) {
@@ -70,9 +91,13 @@ public class Bubble {
         }
     }
 
+    public synchronized boolean isAlive() {
+        return status == BubbleStatus.ALIVE && LocalDateTime.now().isBefore(expiresAt);
+    }
+
     private void validateAlive() {
-        if (status != BubbleStatus.ALIVE) {
-            throw new IllegalStateException("만료된 버블입니다.");
+        if (status != BubbleStatus.ALIVE || LocalDateTime.now().isAfter(expiresAt)) {
+            throw new IllegalStateException("만료된 비눗방울입니다.");
         }
     }
 
@@ -100,7 +125,7 @@ public class Bubble {
         return maxMemberCnt;
     }
 
-    public boolean isOpen() {
+    public boolean getIsOpen() {
         return isOpen;
     }
 

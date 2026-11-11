@@ -62,6 +62,13 @@ public class MessageDispatcher {
                     "REQUEST_FAILED",
                     e.getMessage()
             );
+        } catch (NullPointerException e) {
+            sendError(
+                    connection,
+                    message,
+                    "NPE",
+                    e.getMessage()
+            );
         } catch (RuntimeException e) {
             sendError(
                     connection,

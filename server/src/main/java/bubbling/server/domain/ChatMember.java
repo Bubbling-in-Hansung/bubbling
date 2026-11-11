@@ -7,19 +7,22 @@ import java.util.UUID;
 public class ChatMember {
     private final String id = UUID.randomUUID().toString();
     private final User user;
+    private final ChatRoom chatRoom;
     private final String randomNickname;
     private final LocalDateTime joinedAt = LocalDateTime.now();
     private LocalDateTime leftAt;
 
-    private ChatMember(User user, String randomNickname) {
+    private ChatMember(User user, ChatRoom chatRoom, String randomNickname) {
         this.user = user;
+        this.chatRoom = chatRoom;
         this.randomNickname = randomNickname;
     }
 
-    public static ChatMember create(User user, String nickname) {
+    public static ChatMember create(User user, ChatRoom chatRoom, String nickname) {
         Objects.requireNonNull(user, "사용자는 필수입니다.");
+        Objects.requireNonNull(chatRoom, "채팅방은 필수입니다.");
         validateNickname(nickname);
-        return new ChatMember(user, nickname);
+        return new ChatMember(user, chatRoom, nickname);
     }
 
     private static void validateNickname(String nickname) {
@@ -29,7 +32,7 @@ public class ChatMember {
         }
     }
 
-    synchronized boolean isActive() {
+    public synchronized boolean isActive() {
         return leftAt == null;
     }
 
@@ -46,6 +49,10 @@ public class ChatMember {
 
     public User getUser() {
         return user;
+    }
+
+    public ChatRoom getChatRoom() {
+        return chatRoom;
     }
 
     public String getRandomNickname() {

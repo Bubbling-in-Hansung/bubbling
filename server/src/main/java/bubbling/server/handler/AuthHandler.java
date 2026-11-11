@@ -30,11 +30,17 @@ public class AuthHandler {
                 RegisterRequest.class
         );
 
+        if (connection.isAuthenticated()) {
+            throw new IllegalStateException("이미 로그인 상태입니다.");
+        }
+
         User user = authService.register(
                 request.loginId(),
                 request.password(),
                 request.nickname()
         );
+
+        connection.authenticate(user);
 
         RegisterResponse payload = new RegisterResponse(
                 new UserDto(

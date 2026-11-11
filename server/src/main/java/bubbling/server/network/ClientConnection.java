@@ -104,15 +104,33 @@ public class ClientConnection implements Runnable {
     public synchronized void authenticate(User user) {
         Objects.requireNonNull(user, "사용자는 필수입니다.");
 
-        if (closed.get()) {
-            throw new IllegalStateException("이미 종료된 연결입니다.");
+        synchronized (clientRegistry) {
+            if (closed.get()) {
+                throw new IllegalStateException("이미 종료된 연결입니다.");
+            }
+
+            if (this.user != null) {
+                throw new IllegalStateException("이미 로그인된 연결입니다.");
+            }
+
+            for (ClientConnection connection : clientRegistry.getAll()) {
+                if (connection == this || connection.isClosed()) {
+                    continue;
+                }
+
+                User authenticatedUser = connection.getUser();
+
+                if (authenticatedUser != null && authenticatedUser.getId().equals(user.getId())) {
+                    throw new IllegalStateException("다른 기기에서 로그인 중인 계정입니다.");
+                }
+            }
+
+            this.user = user;
         }
 
-        if (this.user != null) {
-            throw new IllegalStateException("이미 로그인된 연결입니다.");
+        if (!closed.get()) {
+            clientRegistry.notifyOnlineStatusChanged();
         }
-
-        this.user = user;
     }
 
     public User requireAuthenticatedUser() {
