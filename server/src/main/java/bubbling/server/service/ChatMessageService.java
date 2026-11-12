@@ -3,6 +3,8 @@ package bubbling.server.service;
 import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatMessage;
 import bubbling.server.domain.ChatRoom;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatMessageExceptionCode;
 import bubbling.server.store.ChatMessageStore;
 
 import java.util.List;
@@ -25,7 +27,7 @@ public class ChatMessageService {
         Objects.requireNonNull(chatMember, "채팅 멤버는 필수입니다.");
 
         if(!chatMember.getChatRoom().equals(chatRoom)) {
-            throw new IllegalArgumentException("채팅 멤버가 채팅방에 소속되어 있지 않습니다.");
+            throw new BaseException(ChatMessageExceptionCode.FORBIDDEN);
         }
 
         ChatMessage.validateMessage(message);

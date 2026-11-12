@@ -1,6 +1,8 @@
 package bubbling.server.domain;
 
 import bubbling.common.enums.ProfileCharacter;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.UserExceptionCode;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -22,7 +24,7 @@ public class User {
     }
 
     public static User create(String loginId, String password, String nickname, ProfileCharacter profile) {
-        validateId(loginId);
+        validateLoginId(loginId);
         validateNickname(nickname);
         Objects.requireNonNull(profile, "프로필은 필수입니다.");
         return new User(loginId, password, nickname, profile);
@@ -31,26 +33,26 @@ public class User {
     private static void validateNickname(String nickname) {
         Objects.requireNonNull(nickname, "닉네임은 필수입니다.");
         if (nickname.length() < 2 || nickname.length() > 32) {
-            throw new IllegalArgumentException("닉네임은 최소 2자, 최대 32자 이내로 설정해야합니다.");
+            throw new BaseException(UserExceptionCode.INVALID_NICKNAME);
         }
     }
 
-    private static void validateId(String loginId) {
+    private static void validateLoginId(String loginId) {
         Objects.requireNonNull(loginId, "로그인 아이디는 필수입니다.");
         if (loginId.length() < 8 || loginId.length() > 32) {
-            throw new IllegalArgumentException("아이디는 최소 8자, 최대 32자 이내로 설정해야합니다.");
+            throw new BaseException(UserExceptionCode.INVALID_LOGIN_ID);
         }
     }
 
     public static void validatePassword(String originalPassword) {
         Objects.requireNonNull(originalPassword);
         if (originalPassword.length() < 8 || originalPassword.length() > 64) {
-            throw new IllegalArgumentException("비밀번호는 8~64자여야 합니다.");
+            throw new BaseException(UserExceptionCode.INVALID_PASSWORD_LENGTH);
         }
 
         for (int i = 0; i < originalPassword.length(); i++) {
             if (originalPassword.charAt(i) > 127) {
-                throw new IllegalArgumentException("비밀번호에는 1바이트를 초과하는 문자를 사용할 수 없습니다.");
+                throw new BaseException(UserExceptionCode.INVALID_PASSWORD_CHARACTER);
             }
         }
     }

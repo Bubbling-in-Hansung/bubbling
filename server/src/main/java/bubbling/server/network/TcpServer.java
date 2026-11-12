@@ -1,5 +1,8 @@
 package bubbling.server.network;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -11,6 +14,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class TcpServer {
+
+    private static final Logger log = LoggerFactory.getLogger(TcpServer.class);
 
     private final int port;
     private final int maxClients;
@@ -60,9 +65,7 @@ public class TcpServer {
 
         try (ServerSocket listener = new ServerSocket(port)) {
             this.serverSocket = listener;
-            System.out.println("TCP 서버 시작");
-            System.out.println("PORT: " + port);
-            System.out.println("MAX_CLIENTS: " + maxClients);
+            log.info("TCP 서버 시작: port={}, maxClients={}", port, maxClients);
 
             while (running.get()) {
                 Socket socket;
@@ -84,14 +87,14 @@ public class TcpServer {
                     );
 
                     if (!clientRegistry.register(connection, maxClients)) {
-                        System.out.println("최대 접속자 수 초과");
+                        log.warn("최대 접속자 수 초과: maxClients={}", maxClients);
                         connection.close();
                         continue;
                     }
 
                     executorService.execute(connection);
 
-                    System.out.println("클라이언트 접속: " + connection.getId());
+                    log.info("클라이언트 접속: id={}", connection.getId());
                 } catch (IOException | RejectedExecutionException e) {
                     if (connection != null) {
                         connection.close();
@@ -103,7 +106,7 @@ public class TcpServer {
                     }
 
                     if (running.get()) {
-                        System.err.println("연결 처리 실패: " + e.getMessage());
+                        log.warn("클라이언트 연결 처리 실패", e);
                     }
                 }
             }
@@ -119,7 +122,8 @@ public class TcpServer {
         if (listener != null) {
             try {
                 listener.close();
-            } catch (IOException ignored) {
+            } catch (IOException e) {
+                log.warn("서버 소켓 종료 중 오류가 발생했습니다.", e);
             }
         }
 

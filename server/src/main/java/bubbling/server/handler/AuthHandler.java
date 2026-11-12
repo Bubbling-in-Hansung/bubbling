@@ -9,6 +9,8 @@ import bubbling.common.dto.user.UserDto;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.AuthExceptionCode;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.AuthService;
@@ -31,7 +33,7 @@ public class AuthHandler {
         );
 
         if (connection.isAuthenticated()) {
-            throw new IllegalStateException("이미 로그인 상태입니다.");
+            throw new BaseException(AuthExceptionCode.ALREADY_LOGGED_IN);
         }
 
         User user = authService.register(

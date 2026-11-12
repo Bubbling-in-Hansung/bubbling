@@ -1,6 +1,8 @@
 package bubbling.server.domain;
 
 import bubbling.common.enums.ChatRoomStatus;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatRoomExceptionCode;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -24,23 +26,15 @@ public class ChatRoom {
 
     public synchronized void end() {
         if(status == ChatRoomStatus.ENDED) {
-            throw new IllegalStateException("이미 종료된 채팅방입니다.");
+            throw new BaseException(ChatRoomExceptionCode.ENDED);
         }
 
         status = ChatRoomStatus.ENDED;
         endedAt = LocalDateTime.now();
     }
 
-    private void validateActive() {
-        if (status != ChatRoomStatus.ACTIVE) {
-            throw new IllegalStateException("입장이 만료된 채팅방입니다.");
-        }
-    }
-
-    private void validateEnded() {
-        if (status == ChatRoomStatus.ENDED) {
-            throw new IllegalStateException("대화가 종료된 채팅방입니다.");
-        }
+    private boolean isActive() {
+        return status == ChatRoomStatus.ACTIVE;
     }
 
     public String getId() {

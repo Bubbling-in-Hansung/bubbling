@@ -1,6 +1,8 @@
 package bubbling.server.service;
 
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.AuthExceptionCode;
 import bubbling.server.security.PasswordService;
 
 import java.util.Objects;
@@ -33,12 +35,12 @@ public class AuthService {
 
     public User login(String loginId, String password) {
         if (loginId == null || loginId.isBlank() || password == null || password.isEmpty()) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
+            throw new BaseException(AuthExceptionCode.INVALID_CREDENTIALS);
         }
 
         User user = userService.findByLoginId(loginId);
         if (!passwordService.matches(password, user.getPassword())) {
-            throw new IllegalArgumentException("아이디 또는 비밀번호가 올바르지 않습니다.");
+            throw new BaseException(AuthExceptionCode.INVALID_CREDENTIALS);
         }
 
         return user;

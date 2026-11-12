@@ -4,6 +4,8 @@ import bubbling.common.enums.ChatRequestStatus;
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.ChatRequest;
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatRequestExceptionCode;
 
 import java.util.List;
 import java.util.Objects;
@@ -18,15 +20,12 @@ public class ChatRequestStore {
     public synchronized ChatRequest save(ChatRequest request) {
         Objects.requireNonNull(request, "참여 요청은 필수입니다.");
 
-        if (requests.containsKey(request.getId())) {
-            throw new IllegalStateException("이미 존재하는 참여 요청 아이디입니다.");
-        }
-
         if (findPendingByBubbleAndRequester(request.getBubble(), request.getRequester()).isPresent()) {
-            throw new IllegalStateException("이미 대기 중인 참여 요청이 있습니다.");
+            throw new BaseException(ChatRequestExceptionCode.ALREADY_PENDING);
         }
 
         requests.put(request.getId(), request);
+
         return request;
     }
 

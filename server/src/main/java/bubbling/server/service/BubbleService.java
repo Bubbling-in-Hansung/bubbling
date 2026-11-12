@@ -4,6 +4,8 @@ import bubbling.common.enums.BubbleCategory;
 import bubbling.common.enums.BubbleMethod;
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.BubbleExceptionCode;
 import bubbling.server.store.BubbleStore;
 
 import java.time.LocalDateTime;
@@ -44,15 +46,16 @@ public class BubbleService {
             chatRoomService.create(bubble);
         } catch (RuntimeException e) {
             store.delete(bubble.getId());
-            throw new IllegalStateException("비눗방울읠 채팅방을 생성하는데 실패했습니다.", e);
+            throw new BaseException(BubbleExceptionCode.FAILED_TO_CREATION);
         }
 
         return bubble;
     }
 
     public Bubble findById(String id) {
-        return store.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 비눗방울 아이디입니다."));
+        return store.findById(id).orElseThrow(
+                () -> new BaseException(BubbleExceptionCode.NOT_FOUND)
+        );
     }
 
     public Bubble update(
@@ -67,7 +70,7 @@ public class BubbleService {
         Bubble bubble = findById(bubbleId);
 
         if (!bubble.getOwner().getId().equals(requester.getId())) {
-            throw new IllegalArgumentException("비눗방울을 수정할 권한이 없습니다.");
+            throw new BaseException(BubbleExceptionCode.FORBIDDEN);
         }
 
         bubble.update(
@@ -104,7 +107,7 @@ public class BubbleService {
         Bubble bubble = findById(id);
 
         if(!bubble.getOwner().equals(user)) {
-            throw new IllegalStateException("비눗방울을 삭제할 권한이 없습니다.");
+            throw new BaseException(BubbleExceptionCode.FORBIDDEN);
         }
 
         chatRoomService.deleteByBubble(bubble);

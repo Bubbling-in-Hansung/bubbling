@@ -3,6 +3,8 @@ package bubbling.server.store;
 import bubbling.common.enums.ChatRoomStatus;
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.ChatRoom;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatRoomExceptionCode;
 
 import java.util.Objects;
 import java.util.Optional;
@@ -17,12 +19,8 @@ public class ChatRoomStore {
     public synchronized ChatRoom save(ChatRoom chatRoom) {
         Objects.requireNonNull(chatRoom, "채팅방은 필수입니다.");
 
-        if (findById(chatRoom.getId()).isPresent()) {
-            throw new IllegalStateException("이미 존재하는 채팅방 아이디입니다.");
-        }
-
         if (findByBubble(chatRoom.getBubble()).isPresent()) {
-            throw new IllegalStateException("고민 하나당 하나의 채팅방만 생성할 수 있습니다.");
+            throw new BaseException(ChatRoomExceptionCode.ALREADY_EXISTS);
         }
 
         chatRooms.put(chatRoom.getId(), chatRoom);

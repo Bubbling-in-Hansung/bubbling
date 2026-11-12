@@ -3,6 +3,8 @@ package bubbling.server.domain;
 import bubbling.common.enums.BubbleCategory;
 import bubbling.common.enums.BubbleMethod;
 import bubbling.common.enums.BubbleStatus;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.BubbleExceptionCode;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -19,7 +21,7 @@ public class Bubble {
     private BubbleStatus status = BubbleStatus.ALIVE;
     private int reactionCnt = 0;
     private final LocalDateTime createdAt = LocalDateTime.now();
-    private LocalDateTime expiresAt;
+    private final LocalDateTime expiresAt;
 
     private Bubble(User owner, String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen, int expireMinute) {
         this.owner = owner;
@@ -74,20 +76,20 @@ public class Bubble {
 
     private static void validateExpireMinute(int expireMinute) {
         if (expireMinute < 10 || expireMinute > 60) {
-            throw new IllegalArgumentException("만료 시간은 10분 이상 60분 이하로 설정해야합니다.");
+            throw new BaseException(BubbleExceptionCode.INVALID_VALUE);
         }
     }
 
     private static void validateMaxMemberCnt(int maxMemberCnt) {
         if (maxMemberCnt < 2 || maxMemberCnt > 4) {
-            throw new IllegalArgumentException("최대 인원은 2 ~ 4명 사이로 설정해야합니다.");
+            throw new BaseException(BubbleExceptionCode.INVALID_VALUE);
         }
     }
 
     private static void validateTitle(String title) {
         Objects.requireNonNull(title, "제목은 필수입니다.");
         if(title.isEmpty() || title.length() > 50) {
-            throw new IllegalArgumentException("제목은 50자 이내로 작성해야합니다.");
+            throw new BaseException(BubbleExceptionCode.INVALID_VALUE);
         }
     }
 
@@ -97,7 +99,7 @@ public class Bubble {
 
     private void validateAlive() {
         if (status != BubbleStatus.ALIVE || LocalDateTime.now().isAfter(expiresAt)) {
-            throw new IllegalStateException("만료된 비눗방울입니다.");
+            throw new BaseException(BubbleExceptionCode.EXPIRED);
         }
     }
 

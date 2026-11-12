@@ -1,15 +1,22 @@
 package bubbling.server.network;
 
 import bubbling.common.codec.JsonCodec;
-import bubbling.common.dto.system.ErrorResponse;
+import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.ExceptionCode;
+import bubbling.server.exception.code.GlobalExceptionCode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 public class MessageDispatcher {
+
+    private static final Logger log = LoggerFactory.getLogger(MessageDispatcher.class);
 
     private final ConcurrentMap<MessageType, Route> routes = new ConcurrentHashMap<>();
 
@@ -36,9 +43,7 @@ public class MessageDispatcher {
         Route route = new Route(handler, authenticationRequired);
 
         if (routes.putIfAbsent(type, route) != null) {
-            throw new IllegalStateException(
-                    "이미 등록된 메시지 타입입니다: " + type
-            );
+            throw new IllegalStateException("이미 등록된 메시지 타입입니다 -> " + type);
         }
     }
 
@@ -55,26 +60,30 @@ public class MessageDispatcher {
             }
 
             route.handler().handle(connection, message);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            sendError(
-                    connection,
-                    message,
-                    "REQUEST_FAILED",
-                    e.getMessage()
+        } catch (BaseException e) {
+            log.debug(
+                    "요청 처리 실패: code={}, requestId={}",
+                    e.getExceptionCode().getCode(),
+                    message.requestId()
             );
-        } catch (NullPointerException e) {
+
             sendError(
                     connection,
                     message,
-                    "NPE",
-                    e.getMessage()
+                    e.getExceptionCode()
             );
         } catch (RuntimeException e) {
+            log.error(
+                    "메시지 처리 중 내부 오류: type={}, requestId={}",
+                    message.type(),
+                    message.requestId(),
+                    e
+            );
+
             sendError(
                     connection,
                     message,
-                    "INTERNAL_ERROR",
-                    "요청 처리 중 오류가 발생했습니다."
+                    GlobalExceptionCode.INTERNAL_ERROR
             );
         }
     }
@@ -82,18 +91,14 @@ public class MessageDispatcher {
     private void sendError(
             ClientConnection connection,
             MessageEnvelope request,
-            String code,
-            String errorMessage
+            ExceptionCode exceptionCode
     ) {
-        ErrorResponse error = new ErrorResponse(
-                code,
-                errorMessage
-        );
+        ExceptionResponse e = new ExceptionResponse(exceptionCode.getCode(), exceptionCode.getMessage());
 
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.ERROR,
                 request.requestId(),
-                jsonCodec.toPayload(error)
+                jsonCodec.toPayload(e)
         );
 
         messageSender.send(connection, response);

@@ -1,6 +1,6 @@
 package bubbling.common.dto.system;
 
-public record ErrorResponse(
+public record ExceptionResponse(
         String code,
         String message
 ) {}

@@ -6,6 +6,8 @@ import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.BubbleService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.concurrent.Executors;
@@ -13,6 +15,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class BubbleExpirationScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(BubbleExpirationScheduler.class);
 
     private final BubbleService bubbleService;
     private final MessageSender messageSender;
@@ -46,7 +50,7 @@ public class BubbleExpirationScheduler {
                                     messageSender.broadcast(event);
                                 });
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        log.error("비눗방울 만료 처리 중 오류가 발생했습니다.", e);
                     }
                 },
                 0,

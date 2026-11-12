@@ -3,6 +3,8 @@ package bubbling.server.store;
 import bubbling.common.enums.BubbleStatus;
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.BubbleExceptionCode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,11 +21,7 @@ public class BubbleStore {
         Objects.requireNonNull(bubble, "비눗방울은 필수입니다.");
 
         if (findByUserAndStatus(bubble.getOwner(), BubbleStatus.ALIVE).isPresent()) {
-            throw new IllegalStateException("사용자는 한 번에 최대 한 개의 비눗방울을 생성할 수 있습니다.");
-        }
-
-        if (findById(bubble.getId()).isPresent()) {
-            throw new IllegalStateException("이미 존재하는 비눗방울 아이디입니다.");
+            throw new BaseException(BubbleExceptionCode.ALREADY_EXISTS);
         }
 
         bubbles.put(bubble.getId(), bubble);

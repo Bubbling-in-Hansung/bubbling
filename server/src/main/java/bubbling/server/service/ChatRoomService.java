@@ -2,6 +2,8 @@ package bubbling.server.service;
 
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.ChatRoom;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatRoomExceptionCode;
 import bubbling.server.store.ChatRoomStore;
 
 public class ChatRoomService {
@@ -29,13 +31,14 @@ public class ChatRoomService {
             return store.save(chatRoom);
         } catch (RuntimeException e) {
             chatMemberService.deleteAllByChatRoom(chatRoom);
-            throw e;
+            throw new BaseException(ChatRoomExceptionCode.FAILED_TO_CREATION);
         }
     }
 
     public ChatRoom findByBubble(Bubble bubble) {
-        return store.findByBubble(bubble)
-                .orElseThrow(() -> new IllegalStateException("채팅방을 찾을 수 없습니다."));
+        return store.findByBubble(bubble).orElseThrow(
+                () -> new BaseException(ChatRoomExceptionCode.NOT_FOUND)
+        );
     }
 
     public void deleteByBubble(Bubble bubble) {

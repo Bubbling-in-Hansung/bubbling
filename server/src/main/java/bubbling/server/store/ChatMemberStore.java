@@ -3,6 +3,8 @@ package bubbling.server.store;
 import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatRoom;
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatMemberExceptionCode;
 
 import java.util.List;
 import java.util.Objects;
@@ -17,12 +19,8 @@ public class ChatMemberStore {
     public synchronized ChatMember save(ChatMember chatMember) {
         Objects.requireNonNull(chatMember, "채팅의 멤버는 필수입니다.");
 
-        if(findById(chatMember.getId()).isPresent()) {
-            throw new IllegalStateException("채팅 멤버의 아이디가 이미 존재합니다.");
-        }
-
         if(findByChatRoomAndUserAndIsActive(chatMember.getChatRoom(), chatMember.getUser()).isPresent()) {
-            throw new IllegalStateException("해당 채팅방에 이미 참여중입니다.");
+            throw new BaseException(ChatMemberExceptionCode.ALREADY_JOINED);
         }
 
         members.put(chatMember.getId(), chatMember);

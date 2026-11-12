@@ -1,5 +1,8 @@
 package bubbling.server.domain;
 
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatMessageExceptionCode;
+
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -25,10 +28,8 @@ public class ChatMessage {
 
     public static void validateMessage(String message) {
         Objects.requireNonNull(message, "메세지는 필수입니다.");
-        if(message.isEmpty()) {
-            throw new IllegalArgumentException("메세지는 비어있을 수 없습니다.");
-        } else if(message.length() > 1000) {
-            throw new IllegalArgumentException("메세지는 1000자 이내로 작성해야 합니다.");
+        if(message.isEmpty() || message.length() > 1000) {
+            throw new BaseException(ChatMessageExceptionCode.INVALID_MESSAGE);
         }
     }
 

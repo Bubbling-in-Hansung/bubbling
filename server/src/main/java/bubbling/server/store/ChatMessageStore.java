@@ -16,10 +16,6 @@ public class ChatMessageStore {
     public synchronized ChatMessage save(ChatMessage chatMessage) {
         Objects.requireNonNull(chatMessage, "채팅 메세지는 필수입니다.");
 
-        if(findById(chatMessage.getId()).isPresent()) {
-            throw new IllegalStateException("채팅 메세지의 아이디가 중복됩니다.");
-        }
-
         messages.put(chatMessage.getId(), chatMessage);
 
         return chatMessage;
