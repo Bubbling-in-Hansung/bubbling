@@ -4,42 +4,16 @@ import bubbling.server.domain.ChatMessage;
 import bubbling.server.domain.ChatRoom;
 
 import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
-public class ChatMessageStore {
+public class ChatMessageStore extends BaseStore<ChatMessage> {
 
-    private final ConcurrentMap<String, ChatMessage> messages = new ConcurrentHashMap<>();
-
-    public synchronized ChatMessage save(ChatMessage chatMessage) {
-        Objects.requireNonNull(chatMessage, "채팅 메세지는 필수입니다.");
-
-        messages.put(chatMessage.getId(), chatMessage);
-
-        return chatMessage;
-    }
-
-    public Optional<ChatMessage> findById(String id) {
-        return messages.values().stream()
-                .filter(chatMember -> chatMember.getId().equals(id))
-                .findFirst();
+    public ChatMessageStore() {
+        super(ChatMessage::getId);
     }
 
     public List<ChatMessage> findAllByChatRoom(ChatRoom chatRoom) {
-        return messages.values().stream()
+        return findAll().stream()
                 .filter(chatMessage -> chatMessage.getChatRoom().equals(chatRoom))
                 .toList();
-    }
-
-    public synchronized void delete(String id) {
-        messages.remove(id);
-    }
-
-    public synchronized void deleteAll(List<String> ids) {
-        for(String id : ids) {
-            delete(id);
-        }
     }
 }

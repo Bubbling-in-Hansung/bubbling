@@ -8,33 +8,23 @@ import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.ChatRequestExceptionCode;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
-public class ChatRequestStore {
+public class ChatRequestStore extends BaseStore<ChatRequest> {
 
-    private final ConcurrentMap<String, ChatRequest> requests = new ConcurrentHashMap<>();
+    public ChatRequestStore() {
+        super(ChatRequest::getId);
+    }
 
-    public synchronized ChatRequest save(ChatRequest request) {
-        Objects.requireNonNull(request, "참여 요청은 필수입니다.");
-
+    @Override
+    protected void validateSave(ChatRequest request) {
         if (findPendingByBubbleAndRequester(request.getBubble(), request.getRequester()).isPresent()) {
             throw new BaseException(ChatRequestExceptionCode.ALREADY_PENDING);
         }
-
-        requests.put(request.getId(), request);
-
-        return request;
-    }
-
-    public Optional<ChatRequest> findById(String id) {
-        return Optional.ofNullable(requests.get(id));
     }
 
     public Optional<ChatRequest> findPendingByBubbleAndRequester(Bubble bubble, User requester) {
-        return requests.values().stream()
+        return findAll().stream()
                 .filter(request -> request.getBubble().getId().equals(bubble.getId()))
                 .filter(request -> request.getRequester().getId().equals(requester.getId()))
                 .filter(request -> request.getStatus() == ChatRequestStatus.PENDING)
@@ -42,14 +32,8 @@ public class ChatRequestStore {
     }
 
     public List<ChatRequest> findAllByBubble(Bubble bubble) {
-        return requests.values().stream()
+        return findAll().stream()
                 .filter(request -> request.getBubble().getId().equals(bubble.getId()))
                 .toList();
-    }
-
-    public synchronized void deleteAllByBubble(Bubble bubble) {
-        for (ChatRequest request : findAllByBubble(bubble)) {
-            requests.remove(request.getId());
-        }
     }
 }
