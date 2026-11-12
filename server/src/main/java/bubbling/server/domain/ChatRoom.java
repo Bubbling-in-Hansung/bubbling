@@ -33,7 +33,7 @@ public class ChatRoom {
         endedAt = LocalDateTime.now();
     }
 
-    private boolean isActive() {
+    public boolean isActive() {
         return status == ChatRoomStatus.ACTIVE;
     }
 

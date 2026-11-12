@@ -99,7 +99,7 @@ public class BubbleHandler {
         );
 
         ChatRoom chatRoom = chatRoomService.findByBubble(bubble);
-        int currentMemberCnt = chatMemberService.countAllJoinMemberByChatRoom(chatRoom);
+        int currentMemberCnt = chatMemberService.countAllActiveJoinMemberByChatRoom(chatRoom);
 
         BubbleDto payload = new BubbleDto(
                 bubble.getId(),

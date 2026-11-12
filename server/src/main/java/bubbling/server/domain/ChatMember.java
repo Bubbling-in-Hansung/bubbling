@@ -39,7 +39,7 @@ public class ChatMember {
         return leftAt == null;
     }
 
-    synchronized void leave() {
+    public synchronized void leave() {
         if(!isActive()) {
             throw new BaseException(ChatMemberExceptionCode.ALREADY_LEFT);
         }

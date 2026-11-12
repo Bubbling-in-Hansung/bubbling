@@ -2,6 +2,7 @@ package bubbling.server.domain;
 
 import bubbling.common.enums.ChatRequestStatus;
 import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.BubbleExceptionCode;
 import bubbling.server.exception.code.ChatRequestExceptionCode;
 
 import java.time.LocalDateTime;
@@ -25,22 +26,30 @@ public class ChatRequest {
         Objects.requireNonNull(bubble, "버블은 필수입니다.");
         Objects.requireNonNull(requester, "요청자는 필수입니다.");
 
-        if (bubble.getOwner().getId().equals(requester.getId())) {
+        if (!bubble.isAlive()) {
+            throw new BaseException(BubbleExceptionCode.EXPIRED);
+        }
+
+        if (bubble.getIsOpen()) {
+            throw new BaseException(ChatRequestExceptionCode.OPEN_CHATROOM);
+        }
+
+        if (bubble.getOwner().equals(requester)) {
             throw new BaseException(ChatRequestExceptionCode.NOT_ALLOWED);
         }
 
         return new ChatRequest(bubble, requester);
     }
 
-    public synchronized void accept() {
-        validatePending();
+    public synchronized void accept(User user) {
+        validateAcceptable(user);
 
         this.status = ChatRequestStatus.ACCEPTED;
         this.respondedAt = LocalDateTime.now();
     }
 
-    public synchronized void reject() {
-        validatePending();
+    public synchronized void reject(User user) {
+        validateAcceptable(user);
 
         this.status = ChatRequestStatus.REJECTED;
         this.respondedAt = LocalDateTime.now();
@@ -50,6 +59,17 @@ public class ChatRequest {
         if (status != ChatRequestStatus.PENDING) {
             throw new BaseException(ChatRequestExceptionCode.ALREADY_PROCESSED);
         }
+    }
+
+    private void validateOwner(User user) {
+        if (!bubble.getOwner().getId().equals(user.getId())) {
+            throw new BaseException(ChatRequestExceptionCode.FORBIDDEN);
+        }
+    }
+
+    public void validateAcceptable(User user) {
+        validatePending();
+        validateOwner(user);
     }
 
     public String getId() {

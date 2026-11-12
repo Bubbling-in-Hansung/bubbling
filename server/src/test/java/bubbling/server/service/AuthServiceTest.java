@@ -1,6 +1,7 @@
 package bubbling.server.service;
 
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
 import bubbling.server.security.PasswordService;
 import bubbling.server.store.UserStore;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,7 +62,7 @@ class AuthServiceTest {
 
         // When & Then
         assertThrows(
-                IllegalArgumentException.class,
+                BaseException.class,
                 () -> authService.register(
                         "testuser01",
                         "password456",
@@ -75,7 +76,7 @@ class AuthServiceTest {
     @DisplayName("아이디가 8자 미만 또는 32자 초과면 회원가입 불가")
     void registerInvalidLoginId(String loginId) {
         assertThrows(
-                IllegalArgumentException.class,
+                BaseException.class,
                 () -> authService.register(
                         loginId,
                         "password123",
@@ -89,7 +90,7 @@ class AuthServiceTest {
     @DisplayName("패스워드가 8자 미만 또는 64자 초과면 회원가입 불가")
     void registerInvalidPasswordLength(String password) {
         assertThrows(
-                IllegalArgumentException.class,
+                BaseException.class,
                 () -> authService.register(
                         "testuser01",
                         password,
@@ -103,7 +104,7 @@ class AuthServiceTest {
     @DisplayName("패스워드에 허용하지 않는 특수문자가 포함되면 회원가입 불가")
     void registerInvalidPasswordUTF(String password) {
         assertThrows(
-                IllegalArgumentException.class,
+                BaseException.class,
                 () -> authService.register(
                         "testuser01",
                         password,
@@ -144,7 +145,7 @@ class AuthServiceTest {
 
         // When & Then
         assertThrows(
-                IllegalArgumentException.class,
+                BaseException.class,
                 () -> authService.login(
                         "testuser01",
                         "wrongpassword"
@@ -156,7 +157,7 @@ class AuthServiceTest {
     @DisplayName("존재하지 않는 아이디로 로그인")
     void loginUserNotFound() {
         assertThrows(
-                IllegalArgumentException.class,
+                BaseException.class,
                 () -> authService.login(
                         "unknownuser",
                         "password123"

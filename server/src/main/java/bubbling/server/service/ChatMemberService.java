@@ -27,12 +27,17 @@ public class ChatMemberService {
         return store.save(chatMember);
     }
 
-    public List<ChatMember> findAllJoinMemberByChatRoom(ChatRoom chatRoom) {
+    public ChatMember findByChatRoomAndUserAndIsActive(ChatRoom chatRoom, User user) {
+        return store.findByChatRoomAndUserAndIsActive(chatRoom, user)
+                .orElse(null);
+    }
+
+    public List<ChatMember> findAllActiveJoinMemberByChatRoom(ChatRoom chatRoom) {
         return store.findAllByChatRoomAndIsActive(chatRoom);
     }
 
-    public int countAllJoinMemberByChatRoom(ChatRoom chatRoom) {
-        return findAllJoinMemberByChatRoom(chatRoom).size();
+    public int countAllActiveJoinMemberByChatRoom(ChatRoom chatRoom) {
+        return findAllActiveJoinMemberByChatRoom(chatRoom).size();
     }
 
     public void deleteAllByChatRoom(ChatRoom chatRoom) {

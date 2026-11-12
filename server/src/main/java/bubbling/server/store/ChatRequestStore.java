@@ -18,16 +18,26 @@ public class ChatRequestStore extends BaseStore<ChatRequest> {
 
     @Override
     protected void validateSave(ChatRequest request) {
-        if (findPendingByBubbleAndRequester(request.getBubble(), request.getRequester()).isPresent()) {
+        if (findByBubbleAndRequesterAndStatus(
+                request.getBubble(), request.getRequester(), ChatRequestStatus.PENDING
+        ).isPresent()) {
             throw new BaseException(ChatRequestExceptionCode.ALREADY_PENDING);
+        }
+
+        if (findByBubbleAndRequesterAndStatus(
+                request.getBubble(),
+                request.getRequester(),
+                ChatRequestStatus.REJECTED
+        ).isPresent()) {
+            throw new BaseException(ChatRequestExceptionCode.NOT_ALLOWED);
         }
     }
 
-    public Optional<ChatRequest> findPendingByBubbleAndRequester(Bubble bubble, User requester) {
+    public Optional<ChatRequest> findByBubbleAndRequesterAndStatus(Bubble bubble, User requester, ChatRequestStatus status) {
         return findAll().stream()
                 .filter(request -> request.getBubble().getId().equals(bubble.getId()))
                 .filter(request -> request.getRequester().getId().equals(requester.getId()))
-                .filter(request -> request.getStatus() == ChatRequestStatus.PENDING)
+                .filter(request -> request.getStatus() == status)
                 .findFirst();
     }
 

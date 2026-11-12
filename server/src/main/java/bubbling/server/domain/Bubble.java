@@ -21,7 +21,7 @@ public class Bubble {
     private BubbleStatus status = BubbleStatus.ALIVE;
     private int reactionCnt = 0;
     private final LocalDateTime createdAt = LocalDateTime.now();
-    private final LocalDateTime expiresAt;
+    private LocalDateTime expiresAt;
 
     private Bubble(User owner, String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen, int expireMinute) {
         this.owner = owner;
@@ -60,6 +60,11 @@ public class Bubble {
     public synchronized void react() {
         validateAlive();
         this.reactionCnt++;
+    }
+
+    public synchronized void close() {
+        this.status = BubbleStatus.EXPIRED;
+        this.expiresAt = LocalDateTime.now();
     }
 
     public synchronized boolean expireIfElapsed(LocalDateTime now) {
