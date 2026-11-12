@@ -1,6 +1,8 @@
 package bubbling.server.domain;
 
 import bubbling.common.enums.ChatRequestStatus;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatRequestExceptionCode;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -24,7 +26,7 @@ public class ChatRequest {
         Objects.requireNonNull(requester, "요청자는 필수입니다.");
 
         if (bubble.getOwner().getId().equals(requester.getId())) {
-            throw new IllegalArgumentException("자신의 버블에는 참여 요청을 보낼 수 없습니다.");
+            throw new BaseException(ChatRequestExceptionCode.NOT_ALLOWED);
         }
 
         return new ChatRequest(bubble, requester);
@@ -46,7 +48,7 @@ public class ChatRequest {
 
     private void validatePending() {
         if (status != ChatRequestStatus.PENDING) {
-            throw new IllegalStateException("이미 처리된 참여 요청입니다.");
+            throw new BaseException(ChatRequestExceptionCode.ALREADY_PROCESSED);
         }
     }
 
