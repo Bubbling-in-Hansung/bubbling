@@ -7,9 +7,7 @@ import java.awt.*;
 
 public class MainFrame extends JFrame {
 
-    private final ClientConfig cc = new ClientConfig();
-
-    public MainFrame() {
+    public MainFrame(ClientConfig cc) {
         setTitle("Bubbling");
         setSize(cc.getWidth(), cc.getHeight());
         setMinimumSize(new Dimension(cc.getMinWidth(), cc.getMinHeight()));
