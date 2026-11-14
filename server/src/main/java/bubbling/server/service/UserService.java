@@ -7,6 +7,8 @@ import bubbling.server.exception.code.AuthExceptionCode;
 import bubbling.server.exception.code.UserExceptionCode;
 import bubbling.server.store.UserStore;
 
+import java.util.Objects;
+
 public class UserService {
 
     private final UserStore store;
@@ -40,5 +42,12 @@ public class UserService {
         return store.findByLoginId(loginId).orElseThrow(
                 () -> new BaseException(AuthExceptionCode.INVALID_CREDENTIALS)
         );
+    }
+
+    public void update(User user, String nickname, ProfileCharacter profile) {
+        Objects.requireNonNull(user, "사용자는 필수입니다.");
+
+        user.setNickname(nickname);
+        user.setProfile(profile);
     }
 }
