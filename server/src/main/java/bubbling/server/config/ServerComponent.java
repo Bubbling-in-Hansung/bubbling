@@ -72,6 +72,7 @@ public class ServerComponent {
         registerChatRoomHandlers();
         registerChatRequestHandlers();
         registerChatMessageHandlers();
+        registerSystemHandlers();
     }
 
     private void registerPingHandlers() {
@@ -154,7 +155,7 @@ public class ServerComponent {
         );
 
         messageDispatcher.register(
-                MessageType.BUBBLE_DELETE,
+                MessageType.BUBBLE_DETAIL,
                 true,
                 handler::detail
         );
@@ -238,6 +239,22 @@ public class ServerComponent {
                 MessageType.CHAT_HISTORY_REQUEST,
                 true,
                 handler::history
+        );
+    }
+
+    private void registerSystemHandlers() {
+        SystemHandler handler = new SystemHandler(
+                bubbleService,
+                chatRoomService,
+                chatMemberService,
+                clientRegistry,
+                messageSender
+        );
+
+        messageDispatcher.register(
+                MessageType.INITIAL_STATE_REQUEST,
+                true,
+                handler::init
         );
     }
 

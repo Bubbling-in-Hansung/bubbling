@@ -3,6 +3,8 @@ package bubbling.server.network;
 import bubbling.common.codec.JsonCodec;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.server.domain.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.Socket;
@@ -12,6 +14,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ClientConnection implements Runnable {
+
+    private static final Logger log = LoggerFactory.getLogger(ClientConnection.class);
 
     private final String id = UUID.randomUUID().toString();
     private final Socket socket;
@@ -69,11 +73,13 @@ public class ClientConnection implements Runnable {
             }
 
         } catch (IOException e) {
-
+            if (!closed.get()) {
+                log.warn("클라이언트 통신 오류: connectionId={}", id, e);
+            }
         } catch (IllegalArgumentException e) {
-
+            log.warn("잘못된 클라이언트 요청: connectionId={}", id, e);
         } catch (RuntimeException e) {
-
+            log.error("클라이언트 처리 중 예외 발생: connectionId={}", id, e);
         } finally {
             close();
         }
@@ -154,8 +160,8 @@ public class ClientConnection implements Runnable {
 
         try {
             socket.close();
-
         } catch (IOException e) {
+            log.warn("클라이언트 소켓 종료 실패: connectionId={}", id, e);
         } finally {
             clientRegistry.unregister(this);
         }
