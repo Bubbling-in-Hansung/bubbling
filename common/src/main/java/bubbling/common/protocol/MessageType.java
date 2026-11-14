@@ -12,6 +12,8 @@ public enum MessageType {
     REGISTER_RESULT,
     LOGIN,
     LOGIN_RESULT,
+    PASSWORD_CHANGE_REQUEST,
+    PASSWORD_CHANGED,
 
     // 사용자
     USER_INFO_REQUEST,

@@ -1,10 +1,7 @@
 package bubbling.server.handler;
 
 import bubbling.common.codec.JsonCodec;
-import bubbling.common.dto.auth.LoginRequest;
-import bubbling.common.dto.auth.LoginResponse;
-import bubbling.common.dto.auth.RegisterRequest;
-import bubbling.common.dto.auth.RegisterResponse;
+import bubbling.common.dto.auth.*;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.domain.User;
@@ -70,6 +67,30 @@ public class AuthHandler {
                 MessageType.LOGIN_RESULT,
                 message.requestId(),
                 jsonCodec.toPayload(payload)
+        );
+        messageSender.send(connection, response);
+    }
+
+    public void changePassword(
+            ClientConnection connection,
+            MessageEnvelope message
+    ) {
+        PasswordChangeRequest request = jsonCodec.fromPayload(
+                message.payload(),
+                PasswordChangeRequest.class
+        );
+
+        User user = connection.requireAuthenticatedUser();
+
+        authService.changePassword(
+                user,
+                request.currentPassword(),
+                request.newPassword()
+        );
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.PASSWORD_CHANGED,
+                message.requestId(),
+                null
         );
         messageSender.send(connection, response);
     }

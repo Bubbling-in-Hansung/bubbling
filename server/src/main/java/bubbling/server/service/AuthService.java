@@ -3,6 +3,7 @@ package bubbling.server.service;
 import bubbling.server.domain.User;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.AuthExceptionCode;
+import bubbling.server.exception.code.GlobalExceptionCode;
 import bubbling.server.security.PasswordService;
 
 import java.util.Objects;
@@ -44,5 +45,25 @@ public class AuthService {
         }
 
         return user;
+    }
+
+    public void changePassword(User user, String currentPassword, String newPassword) {
+        Objects.requireNonNull(user, "사용자는 필수입니다.");
+
+        if (currentPassword == null || newPassword == null) {
+            throw new BaseException(GlobalExceptionCode.INVALID_REQUEST);
+        }
+
+        if (!passwordService.matches(currentPassword, user.getPassword())) {
+            throw new BaseException(AuthExceptionCode.INVALID_PASSWORD);
+        }
+
+        if(currentPassword.equals(newPassword)) {
+            throw new BaseException(AuthExceptionCode.SAME_AS_CURRENT_PASSWORD);
+        }
+
+        User.validatePassword(newPassword);
+
+        user.setPassword(passwordService.hash(newPassword));
     }
 }

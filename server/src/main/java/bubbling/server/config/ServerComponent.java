@@ -101,6 +101,12 @@ public class ServerComponent {
                 false,
                 handler::login
         );
+
+        messageDispatcher.register(
+                MessageType.PASSWORD_CHANGE_REQUEST,
+                true,
+                handler::changePassword
+        );
     }
 
     private void registerUserHandlers() {
