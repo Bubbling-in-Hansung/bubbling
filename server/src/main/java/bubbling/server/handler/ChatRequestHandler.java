@@ -5,6 +5,9 @@ import bubbling.common.dto.chat.*;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.domain.*;
+import bubbling.server.mapper.ChatParticipantMapper;
+import bubbling.server.mapper.ChatRequestMapper;
+import bubbling.server.mapper.ChatRoomMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.BubbleService;
@@ -46,25 +49,20 @@ public class ChatRequestHandler {
 
         ChatRequest chatRequest = chatRequestService.create(user, bubble);
 
-        ChatRequestCreateResponse payload = new ChatRequestCreateResponse(chatRequest.getId(), bubble.getId());
+        // to requester
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.CHAT_REQUESTED,
                 message.requestId(),
-                jsonCodec.toPayload(payload)
+                jsonCodec.toPayload(ChatRequestMapper.toDto(chatRequest, user))
         );
         messageSender.send(connection, response);
 
+        // to owner
         User owner = bubble.getOwner();
-        ChatRequestCreateEvent eventPayload = new ChatRequestCreateEvent(
-                chatRequest.getId(),
-                bubble.getId(),
-                user.getNickname(),
-                chatRequest.getCreatedAt().toString()
-        );
         MessageEnvelope eventResponse = new MessageEnvelope(
                 MessageType.CHAT_REQUESTED,
                 null,
-                jsonCodec.toPayload(eventPayload)
+                jsonCodec.toPayload(ChatRequestMapper.toDto(chatRequest, owner))
         );
         messageSender.sendTarget(owner, eventResponse);
     }
@@ -78,32 +76,32 @@ public class ChatRequestHandler {
         User user = connection.requireAuthenticatedUser();
 
         ChatMember chatMember = chatRequestService.accept(user, request.chatRequestId());
+        ChatRequest chatRequest = chatRequestService.findById(request.chatRequestId());
         ChatRoom chatRoom = chatMember.getChatRoom();
 
         // accept response
         MessageEnvelope response = new MessageEnvelope(
-                MessageType.CHAT_JOINED,
+                MessageType.CHAT_ACCEPTED,
                 message.requestId(),
-                jsonCodec.toPayload(
-                        new ChatRequestDecisionResponse(
-                                request.chatRequestId(),
-                                chatRoom.getBubble().getId()
-                        )
-                )
+                jsonCodec.toPayload(ChatRequestMapper.toDto(chatRequest, user))
         );
         messageSender.send(connection, response);
 
         // requester response
-        ChatRequestAcceptedEvent acceptedEvent = new ChatRequestAcceptedEvent(
-                request.chatRequestId(),
-                chatRoom.getId(),
+        List<ChatMember> members = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom);
+        List<ChatParticipantDto> participants = members.stream()
+                .map(ChatParticipantMapper::toDto)
+                .toList();
+        ChatRoomDto roomDto = ChatRoomMapper.toDto(
+                chatRoom,
+                members.size(),
                 chatMember.getId(),
-                chatMember.getRandomNickname()
+                participants
         );
         MessageEnvelope event = new MessageEnvelope(
                 MessageType.CHAT_JOINED,
                 null,
-                jsonCodec.toPayload(acceptedEvent)
+                jsonCodec.toPayload(roomDto)
         );
         messageSender.sendTarget(chatMember.getUser(), event);
 
@@ -121,19 +119,18 @@ public class ChatRequestHandler {
         messageSender.broadcast(countEvent);
 
         // join event
-        ChatMemberDto joinPayload = new ChatMemberDto(
+        ChatMemberEvent joinPayload = new ChatMemberEvent(
                 chatRoom.getId(),
-                chatMember.getId(),
-                chatMember.getRandomNickname()
+                ChatParticipantMapper.toDto(chatMember)
         );
         MessageEnvelope joinEvent = new MessageEnvelope(
                 MessageType.CHAT_MEMBER_JOINED,
                 null,
                 jsonCodec.toPayload(joinPayload)
         );
-        List<User> users = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom).stream()
+        List<User> users = members.stream()
                 .map(ChatMember::getUser)
-                .filter(u -> !u.equals(user))
+                .filter(u -> !u.equals(chatMember.getUser()))
                 .toList();
         messageSender.sendAllTarget(users, joinEvent);
     }
@@ -152,12 +149,7 @@ public class ChatRequestHandler {
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.CHAT_REJECTED,
                 message.requestId(),
-                jsonCodec.toPayload(
-                        new ChatRequestDecisionResponse(
-                                request.chatRequestId(),
-                                chatRequest.getBubble().getId()
-                        )
-                )
+                jsonCodec.toPayload(ChatRequestMapper.toDto(chatRequest, user))
         );
         messageSender.send(connection, response);
 
@@ -165,12 +157,7 @@ public class ChatRequestHandler {
         MessageEnvelope event = new MessageEnvelope(
                 MessageType.CHAT_REJECTED,
                 null,
-                jsonCodec.toPayload(
-                        new ChatRequestRejectedEvent(
-                                request.chatRequestId(),
-                                chatRequest.getBubble().getId()
-                        )
-                )
+                jsonCodec.toPayload(ChatRequestMapper.toDto(chatRequest, chatRequest.getRequester()))
         );
         messageSender.sendTarget(chatRequest.getRequester(), event);
     }

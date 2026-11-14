@@ -38,6 +38,7 @@ public enum MessageType {
     CHAT_REQUEST,
     CHAT_REQUESTED,
     CHAT_ACCEPT,
+    CHAT_ACCEPTED,
     CHAT_REJECT,
     CHAT_REJECTED,
 

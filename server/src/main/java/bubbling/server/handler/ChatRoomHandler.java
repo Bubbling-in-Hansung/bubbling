@@ -1,15 +1,15 @@
 package bubbling.server.handler;
 
 import bubbling.common.codec.JsonCodec;
-import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.chat.*;
-import bubbling.common.enums.BubbleStatus;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatRoom;
 import bubbling.server.domain.User;
+import bubbling.server.mapper.ChatParticipantMapper;
+import bubbling.server.mapper.ChatRoomMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.BubbleService;
@@ -55,12 +55,10 @@ public class ChatRoomHandler {
         int count = chatMemberService.countAllActiveJoinMemberByChatRoom(chatRoom);
 
         // join response
-        ChatJoinResponse payload = new ChatJoinResponse(
-                chatRoom.getId(),
-                bubble.getId(),
-                chatMember.getId(),
-                chatMember.getRandomNickname(),
-                count
+        List<ChatParticipantDto> chatParticipants = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom)
+                .stream().map(ChatParticipantMapper::toDto).toList();
+        ChatRoomDto payload = ChatRoomMapper.toDto(
+                chatRoom, count, chatMember.getId(), chatParticipants
         );
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.CHAT_JOINED,
@@ -82,10 +80,9 @@ public class ChatRoomHandler {
         messageSender.broadcast(event);
 
         // join event
-        ChatMemberDto joinPayload = new ChatMemberDto(
+        ChatMemberEvent joinPayload = new ChatMemberEvent(
                 chatRoom.getId(),
-                chatMember.getId(),
-                chatMember.getRandomNickname()
+                ChatParticipantMapper.toDto(chatMember)
         );
         MessageEnvelope joinEvent = new MessageEnvelope(
                 MessageType.CHAT_MEMBER_JOINED,
@@ -140,10 +137,9 @@ public class ChatRoomHandler {
         messageSender.broadcast(event);
 
         // left event
-        ChatMemberDto dto = new ChatMemberDto(
+        ChatMemberEvent dto = new ChatMemberEvent(
                 chatRoom.getId(),
-                bubble.getId(),
-                chatMember.getRandomNickname()
+                ChatParticipantMapper.toDto(chatMember)
         );
         MessageEnvelope joinEvent = new MessageEnvelope(
                 MessageType.CHAT_MEMBER_LEFT,
@@ -186,19 +182,6 @@ public class ChatRoomHandler {
                 null,
                 jsonCodec.toPayload(payload)
         );
-        messageSender.broadcast(event);
-
-        // expire event
-        MessageEnvelope expireEvent = new MessageEnvelope(
-                MessageType.BUBBLE_REMOVED,
-                null,
-                jsonCodec.toPayload(
-                        new BubbleRemovedEvent(
-                                chatRoom.getBubble().getId(),
-                                BubbleStatus.EXPIRED
-                        )
-                )
-        );
-        messageSender.broadcast(expireEvent);
+        messageSender.broadcastExcept(connection, event);
     }
 }

@@ -5,12 +5,12 @@ import bubbling.common.dto.auth.LoginRequest;
 import bubbling.common.dto.auth.LoginResponse;
 import bubbling.common.dto.auth.RegisterRequest;
 import bubbling.common.dto.auth.RegisterResponse;
-import bubbling.common.dto.user.UserDto;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.domain.User;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.AuthExceptionCode;
+import bubbling.server.mapper.UserMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.AuthService;
@@ -44,16 +44,7 @@ public class AuthHandler {
 
         connection.authenticate(user);
 
-        RegisterResponse payload = new RegisterResponse(
-                new UserDto(
-                        user.getId(),
-                        user.getLoginId(),
-                        user.getNickname(),
-                        user.getProfile(),
-                        user.getCreatedAt().toString()
-                )
-        );
-
+        RegisterResponse payload = new RegisterResponse(UserMapper.toDto(user));
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.REGISTER_RESULT,
                 message.requestId(),
@@ -74,17 +65,7 @@ public class AuthHandler {
         );
 
         connection.authenticate(user);
-
-        LoginResponse payload = new LoginResponse(
-                new UserDto(
-                        user.getId(),
-                        user.getLoginId(),
-                        user.getNickname(),
-                        user.getProfile(),
-                        user.getCreatedAt().toString()
-                )
-        );
-
+        LoginResponse payload = new LoginResponse(UserMapper.toDto(user));
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.LOGIN_RESULT,
                 message.requestId(),

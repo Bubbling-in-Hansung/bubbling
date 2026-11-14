@@ -9,6 +9,7 @@ import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatMessage;
 import bubbling.server.domain.ChatRoom;
 import bubbling.server.domain.User;
+import bubbling.server.mapper.ChatMessageMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.ChatMemberService;
@@ -55,14 +56,7 @@ public class ChatMessageHandler {
         );
 
         // message response
-        ChatMessageDto payload = new ChatMessageDto(
-                chatMessage.getId(),
-                chatRoom.getId(),
-                chatMember.getId(),
-                chatMember.getRandomNickname(),
-                chatMessage.getMessage(),
-                chatMessage.getCreatedAt().toString()
-        );
+        ChatMessageDto payload = ChatMessageMapper.toDto(chatMessage);
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.CHAT_MESSAGE,
                 message.requestId(),
