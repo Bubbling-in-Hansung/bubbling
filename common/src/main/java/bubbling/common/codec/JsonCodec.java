@@ -5,13 +5,13 @@ import com.google.gson.Gson;
 import com.google.gson.JsonParseException;
 
 public class JsonCodec {
-
+    
     private final Gson gson = new Gson();
-
+    
     public String encode(MessageEnvelope message) {
         return gson.toJson(message);
     }
-
+    
     public MessageEnvelope decode(String json) {
         try {
             return gson.fromJson(json, MessageEnvelope.class);
@@ -21,7 +21,7 @@ public class JsonCodec {
             );
         }
     }
-
+    
     public String toPayload(Object object) {
         return gson.toJson(object);
     }
