@@ -44,4 +44,8 @@ public class ChatMemberService {
         List<ChatMember> chatMembers = store.findAllByChatRoom(chatRoom);
         store.deleteAll(chatMembers.stream().map(ChatMember::getId).toList());
     }
+
+    public List<ChatMember> findAllActiveJoinMemberByUser(User user) {
+        return store.findAllByUserAndIsActive(user);
+    }
 }

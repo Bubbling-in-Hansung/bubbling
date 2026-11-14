@@ -159,4 +159,25 @@ public class BubbleHandler {
         );
         messageSender.broadcastExcept(connection, event);
     }
+
+    public void detail(ClientConnection connection, MessageEnvelope message) {
+        BubbleDetailRequest request = jsonCodec.fromPayload(
+                message.payload(),
+                BubbleDetailRequest.class
+        );
+
+        connection.requireAuthenticatedUser();
+
+        Bubble bubble = bubbleService.findById(request.bubbleId());
+        ChatRoom chatRoom = chatRoomService.findByBubble(bubble);
+        int count = chatMemberService.countAllActiveJoinMemberByChatRoom(chatRoom);
+
+        BubbleDto payload = BubbleMapper.toDto(bubble, count);
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.BUBBLE_DETAIL,
+                message.requestId(),
+                jsonCodec.toPayload(payload)
+        );
+        messageSender.send(connection, response);
+    }
 }

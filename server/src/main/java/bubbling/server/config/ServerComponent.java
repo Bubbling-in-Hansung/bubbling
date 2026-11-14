@@ -113,6 +113,12 @@ public class ServerComponent {
                 true,
                 handler::update
         );
+
+        messageDispatcher.register(
+                MessageType.USER_INFO_REQUEST,
+                true,
+                handler::info
+        );
     }
 
     private void registerBubbleHandlers() {
@@ -146,6 +152,12 @@ public class ServerComponent {
                 true,
                 handler::react
         );
+
+        messageDispatcher.register(
+                MessageType.BUBBLE_DELETE,
+                true,
+                handler::detail
+        );
     }
 
     private void registerChatRoomHandlers() {
@@ -172,6 +184,12 @@ public class ServerComponent {
                 MessageType.CHAT_END,
                 true,
                 handler::end
+        );
+
+        messageDispatcher.register(
+                MessageType.MY_CHAT_ROOM_LIST_REQUEST,
+                true,
+                handler::list
         );
     }
 
@@ -213,7 +231,13 @@ public class ServerComponent {
         messageDispatcher.register(
                 MessageType.CHAT_MESSAGE,
                 true,
-                handler::message
+                handler::send
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_HISTORY_REQUEST,
+                true,
+                handler::history
         );
     }
 

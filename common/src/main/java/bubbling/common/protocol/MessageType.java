@@ -33,6 +33,8 @@ public enum MessageType {
     BUBBLE_REMOVED,
     BUBBLE_REACT,
     BUBBLE_REACTED,
+    BUBBLE_DETAIL_REQUEST,
+    BUBBLE_DETAIL,
 
     // 상담 요청 (비공개 채팅방)
     CHAT_REQUEST,
@@ -53,10 +55,8 @@ public enum MessageType {
     CHAT_MEMBER_COUNT_CHANGED,
 
     // 채팅방 조회
-    CHAT_ROOM_LIST_REQUEST,
-    CHAT_ROOM_LIST,
-    CHAT_ROOM_DETAIL_REQUEST,
-    CHAT_ROOM_DETAIL,
+    MY_CHAT_ROOM_LIST_REQUEST,
+    MY_CHAT_ROOM_LIST,
 
     // 채팅 메시지
     CHAT_MESSAGE,

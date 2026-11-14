@@ -18,4 +18,8 @@ public class UserHandler {
     public void update(ClientConnection connection, MessageEnvelope message) {
 
     }
+
+    public void info(ClientConnection connection, MessageEnvelope message) {
+
+    }
 }

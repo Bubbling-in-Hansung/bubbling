@@ -1,5 +1,6 @@
 package bubbling.server.service;
 
+import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatMessage;
 import bubbling.server.domain.ChatRoom;
@@ -34,6 +35,10 @@ public class ChatMessageService {
         ChatMessage chatMessage = ChatMessage.create(chatRoom, chatMember, message);
 
         return store.save(chatMessage);
+    }
+
+    public List<ChatMessage> findAllByChatRoom(ChatRoom chatRoom) {
+
     }
 
     public void deleteAllByChatRoom(ChatRoom chatRoom) {

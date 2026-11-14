@@ -40,4 +40,11 @@ public class ChatMemberStore extends BaseStore<ChatMember> {
                 .filter(chatMember -> chatMember.isActive() && chatMember.getChatRoom().equals(chatRoom))
                 .toList();
     }
+
+    public List<ChatMember> findAllByUserAndIsActive(User user) {
+        return findAll().stream()
+                .filter(ChatMember::isActive)
+                .filter(chatMember -> chatMember.getUser().equals(user))
+                .toList();
+    }
 }
