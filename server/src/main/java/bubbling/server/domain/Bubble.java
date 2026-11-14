@@ -151,4 +151,17 @@ public class Bubble {
     public LocalDateTime getExpiresAt() {
         return expiresAt;
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Bubble bubble = (Bubble) o;
+        return Objects.equals(id, bubble.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(id);
+    }
 }
