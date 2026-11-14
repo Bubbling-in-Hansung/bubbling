@@ -39,7 +39,7 @@ public class ChatMember {
         return leftAt == null;
     }
 
-    synchronized void leave() {
+    public synchronized void leave() {
         if(!isActive()) {
             throw new BaseException(ChatMemberExceptionCode.ALREADY_LEFT);
         }
@@ -68,5 +68,18 @@ public class ChatMember {
 
     public LocalDateTime getLeftAt() {
         return leftAt;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatMember that = (ChatMember) o;
+        return Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(id);
     }
 }

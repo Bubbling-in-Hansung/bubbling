@@ -2,6 +2,7 @@ package bubbling.server.domain;
 
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.ChatMessageExceptionCode;
+import bubbling.server.exception.code.ChatRoomExceptionCode;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -23,6 +24,11 @@ public class ChatMessage {
     public static ChatMessage create(ChatRoom chatRoom, ChatMember chatMember, String message) {
         Objects.requireNonNull(chatMember, "채팅 멤버는 필수입니다.");
         validateMessage(message);
+
+        if(!chatRoom.isActive()) {
+            throw new BaseException(ChatRoomExceptionCode.ENDED);
+        }
+
         return new ChatMessage(chatRoom, chatMember, message);
     }
 

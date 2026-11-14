@@ -38,8 +38,9 @@ public enum MessageType {
     CHAT_REQUEST,
     CHAT_REQUESTED,
     CHAT_ACCEPT,
+    CHAT_ACCEPTED,
     CHAT_REJECT,
-    CHAT_REQUEST_UPDATED,
+    CHAT_REJECTED,
 
     // 채팅방
     CHAT_STARTED,
@@ -49,6 +50,7 @@ public enum MessageType {
     CHAT_LEFT,
     CHAT_MEMBER_JOINED,
     CHAT_MEMBER_LEFT,
+    CHAT_MEMBER_COUNT_CHANGED,
 
     // 채팅방 조회
     CHAT_ROOM_LIST_REQUEST,

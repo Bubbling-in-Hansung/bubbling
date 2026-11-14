@@ -1,5 +1,7 @@
 package bubbling.server.handler;
 
+import bubbling.common.protocol.MessageEnvelope;
+import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.UserService;
 
@@ -11,5 +13,9 @@ public class UserHandler {
     public UserHandler(UserService userService, MessageSender messageSender) {
         this.userService = userService;
         this.messageSender = messageSender;
+    }
+
+    public void update(ClientConnection connection, MessageEnvelope message) {
+
     }
 }

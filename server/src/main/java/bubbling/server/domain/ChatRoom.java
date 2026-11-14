@@ -33,7 +33,7 @@ public class ChatRoom {
         endedAt = LocalDateTime.now();
     }
 
-    private boolean isActive() {
+    public boolean isActive() {
         return status == ChatRoomStatus.ACTIVE;
     }
 
@@ -55,5 +55,18 @@ public class ChatRoom {
 
     public LocalDateTime getEndedAt() {
         return endedAt;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatRoom chatRoom = (ChatRoom) o;
+        return Objects.equals(id, chatRoom.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(id);
     }
 }

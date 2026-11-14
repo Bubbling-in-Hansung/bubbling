@@ -35,6 +35,12 @@ public class ClientRegistry {
         return List.copyOf(connections);
     }
 
+    public List<ClientConnection> getOnline() {
+        return connections.stream()
+                .filter(ClientConnection::isAuthenticated)
+                .toList();
+    }
+
     public int getCount() {
         return connections.size();
     }

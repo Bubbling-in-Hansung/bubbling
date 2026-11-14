@@ -1,10 +1,7 @@
 package bubbling.server.config;
 
 import bubbling.common.protocol.MessageType;
-import bubbling.server.handler.AuthHandler;
-import bubbling.server.handler.BubbleHandler;
-import bubbling.server.handler.ChatRoomHandler;
-import bubbling.server.handler.PingHandler;
+import bubbling.server.handler.*;
 import bubbling.server.network.ClientRegistry;
 import bubbling.server.network.MessageDispatcher;
 import bubbling.server.network.MessageSender;
@@ -52,9 +49,9 @@ public class ServerComponent {
         this.authService = new AuthService(userService, passwordService);
         this.chatMemberService = new ChatMemberService(chatMemberStore);
         this.chatMessageService = new ChatMessageService(chatMessageStore);
-        this.chatRoomService = new ChatRoomService(chatRoomStore, chatMessageService, chatMemberService);
+        this.chatRoomService = new ChatRoomService(chatRoomStore, chatMessageService, chatMemberService, chatRequestStore);
         this.bubbleService = new BubbleService(bubbleStore, chatRoomService);
-        this.chatRequestService = new ChatRequestService(chatRequestStore, chatRoomService);
+        this.chatRequestService = new ChatRequestService(chatRequestStore, chatRoomService, chatMemberService);
 
         this.bubbleExpirationScheduler = new BubbleExpirationScheduler(bubbleService, messageSender);
 
@@ -69,8 +66,12 @@ public class ServerComponent {
 
     private void registerHandlers() {
         registerPingHandlers();
+        registerUserHandlers();
         registerAuthHandlers();
         registerBubbleHandlers();
+        registerChatRoomHandlers();
+        registerChatRequestHandlers();
+        registerChatMessageHandlers();
     }
 
     private void registerPingHandlers() {
@@ -98,6 +99,19 @@ public class ServerComponent {
                 MessageType.LOGIN,
                 false,
                 handler::login
+        );
+    }
+
+    private void registerUserHandlers() {
+        UserHandler handler = new UserHandler(
+                userService,
+                messageSender
+        );
+
+        messageDispatcher.register(
+                MessageType.USER_UPDATE,
+                true,
+                handler::update
         );
     }
 
@@ -136,7 +150,9 @@ public class ServerComponent {
 
     private void registerChatRoomHandlers() {
         ChatRoomHandler handler = new ChatRoomHandler(
+                bubbleService,
                 chatRoomService,
+                chatMemberService,
                 messageSender
         );
 
@@ -156,6 +172,48 @@ public class ServerComponent {
                 MessageType.CHAT_END,
                 true,
                 handler::end
+        );
+    }
+
+    private void registerChatRequestHandlers() {
+        ChatRequestHandler handler = new ChatRequestHandler(
+                bubbleService,
+                chatMemberService,
+                chatRequestService,
+                messageSender
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_REQUEST,
+                true,
+                handler::request
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_ACCEPT,
+                true,
+                handler::accept
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_REJECT,
+                true,
+                handler::reject
+        );
+    }
+
+    private void registerChatMessageHandlers() {
+        ChatMessageHandler handler = new ChatMessageHandler(
+                chatRoomService,
+                chatMemberService,
+                chatMessageService,
+                messageSender
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_MESSAGE,
+                true,
+                handler::message
         );
     }
 

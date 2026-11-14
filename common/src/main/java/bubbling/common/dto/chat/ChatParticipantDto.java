@@ -5,6 +5,5 @@ import bubbling.common.enums.ProfileCharacter;
 public record ChatParticipantDto(
         String memberId,
         String nickname,
-        ProfileCharacter profile,
-        boolean owner
+        ProfileCharacter profile
 ) {}

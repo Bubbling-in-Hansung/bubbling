@@ -8,6 +8,7 @@ import bubbling.common.protocol.MessageType;
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.ChatRoom;
 import bubbling.server.domain.User;
+import bubbling.server.mapper.BubbleMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.BubbleService;
@@ -52,20 +53,7 @@ public class BubbleHandler {
                 request.expireMinute()
         );
 
-        BubbleDto payload = new BubbleDto(
-                bubble.getId(),
-                bubble.getTitle(),
-                bubble.getCategory(),
-                bubble.getMethod(),
-                bubble.getMaxMemberCnt(),
-                1,
-                bubble.getIsOpen(),
-                bubble.getStatus(),
-                bubble.getReactionCnt(),
-                bubble.getCreatedAt().toString(),
-                bubble.getExpiresAt().toString()
-        );
-
+        BubbleDto payload = BubbleMapper.toDto(bubble, 1);
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.BUBBLE_CREATED,
                 message.requestId(),
@@ -99,22 +87,9 @@ public class BubbleHandler {
         );
 
         ChatRoom chatRoom = chatRoomService.findByBubble(bubble);
-        int currentMemberCnt = chatMemberService.countAllJoinMemberByChatRoom(chatRoom);
+        int currentMemberCnt = chatMemberService.countAllActiveJoinMemberByChatRoom(chatRoom);
 
-        BubbleDto payload = new BubbleDto(
-                bubble.getId(),
-                bubble.getTitle(),
-                bubble.getCategory(),
-                bubble.getMethod(),
-                bubble.getMaxMemberCnt(),
-                currentMemberCnt,
-                bubble.getIsOpen(),
-                bubble.getStatus(),
-                bubble.getReactionCnt(),
-                bubble.getCreatedAt().toString(),
-                bubble.getExpiresAt().toString()
-        );
-
+        BubbleDto payload = BubbleMapper.toDto(bubble, currentMemberCnt);
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.BUBBLE_UPDATED,
                 message.requestId(),
