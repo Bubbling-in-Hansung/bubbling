@@ -8,7 +8,9 @@ public enum UserExceptionCode implements ExceptionCode {
     INVALID_NICKNAME("USER_003", "유효하지 않은 닉네임입니다."),
     INVALID_LOGIN_ID("USER_004", "유효하지 않은 로그인 아이디입니다."),
     INVALID_PASSWORD_LENGTH("USER_005", "유효한 패스워드 길이를 벗어났습니다."),
-    INVALID_PASSWORD_CHARACTER("USER_006", "패스워드에 유효하지 않은 문자가 포함되었습니다.");
+    INVALID_PASSWORD_CHARACTER("USER_006", "패스워드에 유효하지 않은 문자가 포함되었거나 최소 조건을 만족하지 못했습니다."),
+    INVALID_LOGIN_ID_CHARACTER("USER_007", "로그인 아이디에 유효하지 않은 문자가 포함되었거나 최소 조건을 만족하지 못했습니다."),
+    ;
 
     private final String code;
     private final String message;
