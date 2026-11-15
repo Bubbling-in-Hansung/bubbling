@@ -58,6 +58,13 @@ public class BubbleService {
         );
     }
 
+    public List<Bubble> findAllByAlive() {
+        return store.findAll()
+                .stream()
+                .filter(Bubble::isAlive)
+                .toList();
+    }
+
     public Bubble update(
             User requester,
             String bubbleId,

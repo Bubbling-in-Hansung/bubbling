@@ -1,6 +1,7 @@
 package bubbling.server.handler;
 
 import bubbling.common.codec.JsonCodec;
+import bubbling.common.dto.chat.ChatHistoryRequest;
 import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.common.dto.chat.ChatMessageRequest;
 import bubbling.common.protocol.MessageEnvelope;
@@ -9,6 +10,8 @@ import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatMessage;
 import bubbling.server.domain.ChatRoom;
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatRoomExceptionCode;
 import bubbling.server.mapper.ChatMessageMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
@@ -16,6 +19,7 @@ import bubbling.server.service.ChatMemberService;
 import bubbling.server.service.ChatMessageService;
 import bubbling.server.service.ChatRoomService;
 
+import java.util.Comparator;
 import java.util.List;
 
 public class ChatMessageHandler {
@@ -39,7 +43,7 @@ public class ChatMessageHandler {
         this.messageSender = messageSender;
     }
 
-    public void message(ClientConnection connection, MessageEnvelope message) {
+    public void send(ClientConnection connection, MessageEnvelope message) {
         ChatMessageRequest request = jsonCodec.fromPayload(
                 message.payload(),
                 ChatMessageRequest.class
@@ -75,5 +79,31 @@ public class ChatMessageHandler {
                 .filter(u -> !u.equals(user))
                 .toList();
         messageSender.sendAllTarget(users, event);
+    }
+
+    public void history(ClientConnection connection, MessageEnvelope message) {
+        ChatHistoryRequest request = jsonCodec.fromPayload(
+                message.payload(),
+                ChatHistoryRequest.class
+        );
+
+        User user = connection.requireAuthenticatedUser();
+        ChatRoom chatRoom = chatRoomService.findById(request.chatRoomId());
+        ChatMember chatMember = chatMemberService.findByChatRoomAndUserAndIsActive(chatRoom, user);
+        if(chatMember == null) {
+            throw new BaseException(ChatRoomExceptionCode.FORBIDDEN);
+        }
+
+        List<ChatMessageDto> payload = chatMessageService.findAllByChatRoom(chatRoom)
+                .stream()
+                .sorted(Comparator.comparing(ChatMessage::getCreatedAt))
+                .map(ChatMessageMapper::toDto)
+                .toList();
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.CHAT_HISTORY,
+                message.requestId(),
+                jsonCodec.toPayload(payload)
+        );
+        messageSender.send(connection, response);
     }
 }

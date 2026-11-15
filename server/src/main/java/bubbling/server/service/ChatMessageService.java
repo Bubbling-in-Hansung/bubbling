@@ -36,6 +36,10 @@ public class ChatMessageService {
         return store.save(chatMessage);
     }
 
+    public List<ChatMessage> findAllByChatRoom(ChatRoom chatRoom) {
+        return store.findAllByChatRoom(chatRoom);
+    }
+
     public void deleteAllByChatRoom(ChatRoom chatRoom) {
         List<ChatMessage> chatMessages = store.findAllByChatRoom(chatRoom);
         store.deleteAll(chatMessages.stream().map(ChatMessage::getId).toList());

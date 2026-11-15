@@ -7,7 +7,8 @@ public enum AuthExceptionCode implements ExceptionCode {
     INVALID_PASSWORD("AUTH_002", "유효하지 않은 비밀번호입니다."),
     INVALID_CREDENTIALS("AUTH_003", "아이디 또는 비밀번호가 일치하지 않습니다."),
     AUTH_REQUIRED("AUTH_004", "로그인이 필요합니다."),
-    ALREADY_LOGGED_IN("AUTH_005", "이미 로그인 중인 사용자입니다.");
+    ALREADY_LOGGED_IN("AUTH_005", "이미 로그인 중인 사용자입니다."),
+    SAME_AS_CURRENT_PASSWORD("AUTH_006", "현재 비밀번호와 일치합니다.");
 
     private final String code;
     private final String message;

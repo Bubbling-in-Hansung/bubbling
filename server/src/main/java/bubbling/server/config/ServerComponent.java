@@ -72,6 +72,7 @@ public class ServerComponent {
         registerChatRoomHandlers();
         registerChatRequestHandlers();
         registerChatMessageHandlers();
+        registerSystemHandlers();
     }
 
     private void registerPingHandlers() {
@@ -100,6 +101,12 @@ public class ServerComponent {
                 false,
                 handler::login
         );
+
+        messageDispatcher.register(
+                MessageType.PASSWORD_CHANGE_REQUEST,
+                true,
+                handler::changePassword
+        );
     }
 
     private void registerUserHandlers() {
@@ -112,6 +119,12 @@ public class ServerComponent {
                 MessageType.USER_UPDATE,
                 true,
                 handler::update
+        );
+
+        messageDispatcher.register(
+                MessageType.USER_INFO_REQUEST,
+                true,
+                handler::info
         );
     }
 
@@ -146,6 +159,12 @@ public class ServerComponent {
                 true,
                 handler::react
         );
+
+        messageDispatcher.register(
+                MessageType.BUBBLE_DETAIL,
+                true,
+                handler::detail
+        );
     }
 
     private void registerChatRoomHandlers() {
@@ -172,6 +191,12 @@ public class ServerComponent {
                 MessageType.CHAT_END,
                 true,
                 handler::end
+        );
+
+        messageDispatcher.register(
+                MessageType.MY_CHAT_ROOM_LIST_REQUEST,
+                true,
+                handler::list
         );
     }
 
@@ -213,7 +238,29 @@ public class ServerComponent {
         messageDispatcher.register(
                 MessageType.CHAT_MESSAGE,
                 true,
-                handler::message
+                handler::send
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_HISTORY_REQUEST,
+                true,
+                handler::history
+        );
+    }
+
+    private void registerSystemHandlers() {
+        SystemHandler handler = new SystemHandler(
+                bubbleService,
+                chatRoomService,
+                chatMemberService,
+                clientRegistry,
+                messageSender
+        );
+
+        messageDispatcher.register(
+                MessageType.INITIAL_STATE_REQUEST,
+                true,
+                handler::init
         );
     }
 

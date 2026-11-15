@@ -184,4 +184,32 @@ public class ChatRoomHandler {
         );
         messageSender.broadcastExcept(connection, event);
     }
+
+    public void list(ClientConnection connection, MessageEnvelope message) {
+        User user = connection.requireAuthenticatedUser();
+
+        List<ChatMember> myMembers = chatMemberService.findAllActiveJoinMemberByUser(user);
+        List<ChatRoomDto> payload = myMembers
+                .stream()
+                .map(myMember -> {
+                    ChatRoom chatRoom = myMember.getChatRoom();
+                    List<ChatMember> members = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom);
+                    List<ChatParticipantDto> participants = members.stream()
+                            .map(ChatParticipantMapper::toDto)
+                            .toList();
+                    return ChatRoomMapper.toDto(
+                            chatRoom,
+                            members.size(),
+                            myMember.getId(),
+                            participants
+                    );
+                })
+                .toList();
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.MY_CHAT_ROOM_LIST,
+                message.requestId(),
+                jsonCodec.toPayload(payload)
+        );
+        messageSender.send(connection, response);
+    }
 }

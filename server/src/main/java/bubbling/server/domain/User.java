@@ -86,10 +86,13 @@ public class User {
     }
 
     public void setNickname(String nickname) {
+        Objects.requireNonNull(nickname);
+        validateNickname(nickname);
         this.nickname = nickname;
     }
 
     public void setProfile(ProfileCharacter profile) {
+        Objects.requireNonNull(profile);
         this.profile = profile;
     }
 
