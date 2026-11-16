@@ -34,7 +34,7 @@ class AuthServiceTest {
     void registerSuccess() {
         // Given
         String loginId = "testuser01";
-        String password = "password123";
+        String password = "password123!";
         String nickname = "테스터";
 
         // When
@@ -56,7 +56,7 @@ class AuthServiceTest {
         // Given
         authService.register(
                 "testuser01",
-                "password123",
+                "password123!",
                 "테스터1"
         );
 
@@ -65,7 +65,7 @@ class AuthServiceTest {
                 BaseException.class,
                 () -> authService.register(
                         "testuser01",
-                        "password456",
+                        "password456!",
                         "테스터2"
                 )
         );
@@ -119,14 +119,14 @@ class AuthServiceTest {
         // Given
         User registeredUser = authService.register(
                 "testuser01",
-                "password123",
+                "password123!",
                 "테스터"
         );
 
         // When
         User loggedInUser = authService.login(
                 "testuser01",
-                "password123"
+                "password123!"
         );
 
         // Then
@@ -139,7 +139,7 @@ class AuthServiceTest {
         // Given
         authService.register(
                 "testuser01",
-                "password123",
+                "password123!",
                 "테스터"
         );
 
@@ -148,7 +148,7 @@ class AuthServiceTest {
                 BaseException.class,
                 () -> authService.login(
                         "testuser01",
-                        "wrongpassword"
+                        "wrongpassword!"
                 )
         );
     }
@@ -160,7 +160,7 @@ class AuthServiceTest {
                 BaseException.class,
                 () -> authService.login(
                         "unknownuser",
-                        "password123"
+                        "password123!"
                 )
         );
     }
