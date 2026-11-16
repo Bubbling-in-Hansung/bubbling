@@ -6,7 +6,7 @@ public class StringValidator {
 
     private static final Pattern VALID_LOGIN_ID = Pattern.compile("^[a-zA-Z][a-zA-Z0-9]*$");
     private static final Pattern VALID_PASSWORD = Pattern.compile("^(?=.*[a-zA-Z])(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]+$");
-    private static final Pattern VALID_NICKNAME = Pattern.compile("^[가-힣a-zA-Z0-9]+$");
+    private static final Pattern VALID_NICKNAME = Pattern.compile("^[가-힣a-zA-Z0-9]+(?:\\s[가-힣a-zA-Z0-9]+)*$");
 
     public static boolean validateLoginId(String str) {
         return VALID_LOGIN_ID.matcher(str).matches();

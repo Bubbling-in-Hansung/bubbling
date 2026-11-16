@@ -31,7 +31,7 @@ public class UserHandler {
 
         User user = connection.requireAuthenticatedUser();
 
-        userService.update(user, request.nickname(), request.profile());
+        user = userService.update(user, request.nickname(), request.profile());
 
         UserDto payload = UserMapper.toDto(user);
         MessageEnvelope response = new MessageEnvelope(
