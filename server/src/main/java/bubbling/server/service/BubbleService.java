@@ -76,7 +76,7 @@ public class BubbleService {
     ) {
         Bubble bubble = findById(bubbleId);
 
-        if (!bubble.getOwner().getId().equals(requester.getId())) {
+        if (!bubble.getOwner().equals(requester)) {
             throw new BaseException(BubbleExceptionCode.FORBIDDEN);
         }
 
@@ -102,8 +102,12 @@ public class BubbleService {
         return bubbles;
     }
 
-    public Bubble react(String id) {
+    public Bubble react(User requester, String id) {
         Bubble bubble = findById(id);
+
+        if(bubble.getOwner().equals(requester)) {
+            throw new BaseException(BubbleExceptionCode.NOT_ALLOWED_TO_OWNER);
+        }
 
         bubble.react();
 
