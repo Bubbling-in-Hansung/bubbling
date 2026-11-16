@@ -33,6 +33,7 @@ class BubbleServiceTest {
     private AuthService authService;
     private BubbleService bubbleService;
     private ChatMemberService chatMemberService;
+    private ChatRequestService chatRequestService;
 
     private static PasswordService passwordService;
 
@@ -66,10 +67,16 @@ class BubbleServiceTest {
                 chatRequestStore
         );
 
+        chatRequestService = new ChatRequestService(
+                chatRequestStore,
+                chatRoomService,
+                chatMemberService
+        );
+
         bubbleService = new BubbleService(
                 bubbleStore,
-                chatRoomService
-        );
+                chatRoomService,
+                chatRequestService);
     }
 
     @Test
@@ -227,7 +234,7 @@ class BubbleServiceTest {
     }
 
     @Test
-    @DisplayName("비눗방울 삭제 시 채팅방과 방장 멤버도 삭제된다")
+    @DisplayName("비눗방울 삭제 시 채팅방과 방장 멤버도 삭제")
     void deleteSuccess() {
         // Given
         User owner = UserFixtures.createUser(authService,"1");

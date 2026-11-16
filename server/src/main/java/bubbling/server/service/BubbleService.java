@@ -16,10 +16,12 @@ public class BubbleService {
 
     private final BubbleStore store;
     private final ChatRoomService chatRoomService;
+    private final ChatRequestService chatRequestService;
 
-    public BubbleService(BubbleStore bubbleStore, ChatRoomService chatRoomService) {
+    public BubbleService(BubbleStore bubbleStore, ChatRoomService chatRoomService, ChatRequestService chatRequestService) {
         this.store = bubbleStore;
         this.chatRoomService = chatRoomService;
+        this.chatRequestService = chatRequestService;
     }
 
     public Bubble create(
@@ -122,6 +124,7 @@ public class BubbleService {
         }
 
         chatRoomService.deleteByBubble(bubble);
+        chatRequestService.deleteAllByBubble(bubble);
         store.delete(bubble.getId());
 
         return bubble;
