@@ -333,7 +333,8 @@ class BubbleServiceTest {
         assertAll(
                 () -> assertTrue(bubbleStore.findById(bubbleId).isEmpty()),
                 () -> assertTrue(chatRoomStore.findById(chatRoomId).isEmpty()),
-                () -> assertTrue(chatMemberStore.findById(chatMemberId).isEmpty())
+                () -> assertTrue(chatMemberStore.findById(chatMemberId).isEmpty()),
+                () -> assertEquals(0, chatRequestStore.findAll().size())
         );
     }
 }
