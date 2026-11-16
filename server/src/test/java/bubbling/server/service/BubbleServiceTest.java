@@ -135,10 +135,28 @@ class BubbleServiceTest {
         User owner = UserFixtures.createUser(authService,"1");
 
         // When
-        BubbleFixtures.createOpenBubble(owner);
+        Bubble origin = BubbleFixtures.createOpenBubble(owner);
+        bubbleService.create(
+                owner,
+                origin.getTitle(),
+                origin.getCategory(),
+                origin.getMethod(),
+                origin.getMaxMemberCnt(),
+                origin.getIsOpen(),
+                30
+        );
+        Bubble dup = BubbleFixtures.createOpenBubble(owner);
 
         // Then
-        assertThrows(BaseException.class, () -> BubbleFixtures.createOpenBubble(owner));
+        assertThrows(BaseException.class, () -> bubbleService.create(
+                owner,
+                dup.getTitle(),
+                dup.getCategory(),
+                dup.getMethod(),
+                dup.getMaxMemberCnt(),
+                dup.getIsOpen(),
+                30
+        ));
     }
 
     @Test
@@ -150,6 +168,25 @@ class BubbleServiceTest {
 
         Bubble aliveBubble = BubbleFixtures.createOpenBubble(owner1);
         Bubble expiredBubble = BubbleFixtures.createOpenBubble(owner2);
+
+        aliveBubble = bubbleService.create(
+                owner1,
+                aliveBubble.getTitle(),
+                aliveBubble.getCategory(),
+                aliveBubble.getMethod(),
+                aliveBubble.getMaxMemberCnt(),
+                aliveBubble.getIsOpen(),
+                30
+        );
+        expiredBubble = bubbleService.create(
+                owner2,
+                expiredBubble.getTitle(),
+                expiredBubble.getCategory(),
+                expiredBubble.getMethod(),
+                expiredBubble.getMaxMemberCnt(),
+                expiredBubble.getIsOpen(),
+                30
+        );
 
         expiredBubble.close();
 
@@ -168,6 +205,15 @@ class BubbleServiceTest {
         // Given
         User owner = UserFixtures.createUser(authService,"1");
         Bubble bubble = BubbleFixtures.createOpenBubble(owner);
+        bubble = bubbleService.create(
+                owner,
+                bubble.getTitle(),
+                bubble.getCategory(),
+                bubble.getMethod(),
+                bubble.getMaxMemberCnt(),
+                bubble.getIsOpen(),
+                30
+        );
 
         // When
         bubbleService.update(
@@ -202,6 +248,15 @@ class BubbleServiceTest {
         User owner = UserFixtures.createUser(authService,"1");
 
         Bubble bubble = BubbleFixtures.createOpenBubble(owner);
+        bubble = bubbleService.create(
+                owner,
+                bubble.getTitle(),
+                bubble.getCategory(),
+                bubble.getMethod(),
+                bubble.getMaxMemberCnt(),
+                bubble.getIsOpen(),
+                30
+        );
 
         User reactor1 = UserFixtures.createUser(authService,"r1");
         User reactor2 = UserFixtures.createUser(authService,"r2");
@@ -217,20 +272,30 @@ class BubbleServiceTest {
     }
 
     @Test
-    @DisplayName("비눗방울 소유자의 리액션")
+    @DisplayName("비눗방울 소유자는 자신의 비눗방울에 공감할 수 없다")
     void reactOwner() {
         // Given
-        User owner = UserFixtures.createUser(authService,"1");
-        Bubble bubble = BubbleFixtures.createOpenBubble(owner);
+        User owner = UserFixtures.createUser(authService, "1");
 
-        // When & Then
-        assertThrows(
-                BaseException.class,
-                () -> bubbleService.react(
-                        owner,
-                        bubble.getId()
-                )
+        Bubble origin = BubbleFixtures.createOpenBubble(owner);
+        Bubble bubble = bubbleService.create(
+                owner,
+                origin.getTitle(),
+                origin.getCategory(),
+                origin.getMethod(),
+                origin.getMaxMemberCnt(),
+                origin.getIsOpen(),
+                30
         );
+
+        // When
+        BaseException exception = assertThrows(
+                BaseException.class,
+                () -> bubbleService.react(owner, bubble.getId())
+        );
+
+        // Then
+        assertEquals(0, bubble.getReactionCnt());
     }
 
     @Test
@@ -239,6 +304,15 @@ class BubbleServiceTest {
         // Given
         User owner = UserFixtures.createUser(authService,"1");
         Bubble bubble = BubbleFixtures.createOpenBubble(owner);
+        bubble = bubbleService.create(
+                owner,
+                bubble.getTitle(),
+                bubble.getCategory(),
+                bubble.getMethod(),
+                bubble.getMaxMemberCnt(),
+                bubble.getIsOpen(),
+                30
+        );
 
         ChatRoom chatRoom = chatRoomStore.findByBubble(bubble)
                 .orElseThrow();
