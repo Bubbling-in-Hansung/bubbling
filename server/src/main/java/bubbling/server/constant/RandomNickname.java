@@ -27,6 +27,6 @@ public class RandomNickname {
         int firstRandom = (int)(Math.random() * firstSize);
         int lastRandom = (int)(Math.random() * lastSize);
 
-        return FIRST_NAME.get(firstRandom) + LAST_NAME.get(lastRandom);
+        return FIRST_NAME.get(firstRandom) + " " + LAST_NAME.get(lastRandom);
     }
 }
