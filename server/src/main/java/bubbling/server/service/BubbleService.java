@@ -98,6 +98,7 @@ public class BubbleService {
         for (Bubble bubble : store.findAll()) {
             if(bubble.expireIfElapsed(now)) {
                 bubbles.add(bubble);
+                chatRequestService.cancel(bubble);
             }
         }
 

@@ -20,7 +20,7 @@ public class ChatMemberService {
     }
 
     public ChatMember create(User user, ChatRoom chatRoom) {
-        Set<String> originSet = store.findAllByChatRoom(chatRoom).stream()
+        Set<String> originSet = store.findAllByChatRoomAndIsActive(chatRoom).stream()
                 .map(ChatMember::getRandomNickname).collect(Collectors.toSet());;
 
         String newNickname;
