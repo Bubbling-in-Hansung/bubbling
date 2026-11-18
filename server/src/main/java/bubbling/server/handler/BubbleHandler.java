@@ -139,9 +139,9 @@ public class BubbleHandler {
                 BubbleReactionRequest.class
         );
 
-        connection.requireAuthenticatedUser();
+        User user = connection.requireAuthenticatedUser();
 
-        Bubble bubble = bubbleService.react(request.bubbleId());
+        Bubble bubble = bubbleService.react(user, request.bubbleId());
 
         BubbleReactionEvent payload = new BubbleReactionEvent(bubble.getId(), bubble.getReactionCnt());
 

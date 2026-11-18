@@ -3,6 +3,7 @@ package bubbling.server.domain;
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.UserExceptionCode;
+import bubbling.server.util.StringValidator;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -24,24 +25,40 @@ public class User {
     }
 
     public static User create(String loginId, String password, String nickname, ProfileCharacter profile) {
-        validateLoginId(loginId);
-        validateNickname(nickname);
+        loginId = validateLoginId(loginId);
+        nickname = validateNickname(nickname);
+        Objects.requireNonNull(password);
         Objects.requireNonNull(profile, "프로필은 필수입니다.");
         return new User(loginId, password, nickname, profile);
     }
 
-    private static void validateNickname(String nickname) {
+    private static String validateNickname(String nickname) {
         Objects.requireNonNull(nickname, "닉네임은 필수입니다.");
+
+        nickname = nickname.strip();
+
         if (nickname.length() < 2 || nickname.length() > 32) {
             throw new BaseException(UserExceptionCode.INVALID_NICKNAME);
         }
+
+        if (!StringValidator.validateNickname(nickname)) {
+            throw new BaseException(UserExceptionCode.INVALID_NICKNAME);
+        }
+
+        return nickname;
     }
 
-    private static void validateLoginId(String loginId) {
+    private static String validateLoginId(String loginId) {
         Objects.requireNonNull(loginId, "로그인 아이디는 필수입니다.");
         if (loginId.length() < 8 || loginId.length() > 32) {
             throw new BaseException(UserExceptionCode.INVALID_LOGIN_ID);
         }
+
+        if(!StringValidator.validateLoginId(loginId)) {
+            throw new BaseException(UserExceptionCode.INVALID_LOGIN_ID_CHARACTER);
+        }
+
+        return loginId.strip();
     }
 
     public static void validatePassword(String originalPassword) {
@@ -50,10 +67,8 @@ public class User {
             throw new BaseException(UserExceptionCode.INVALID_PASSWORD_LENGTH);
         }
 
-        for (int i = 0; i < originalPassword.length(); i++) {
-            if (originalPassword.charAt(i) > 127) {
-                throw new BaseException(UserExceptionCode.INVALID_PASSWORD_CHARACTER);
-            }
+        if(!StringValidator.validatePassword(originalPassword)) {
+            throw new BaseException(UserExceptionCode.INVALID_PASSWORD_CHARACTER);
         }
     }
 
@@ -87,7 +102,7 @@ public class User {
 
     public void setNickname(String nickname) {
         Objects.requireNonNull(nickname);
-        validateNickname(nickname);
+        nickname = validateNickname(nickname);
         this.nickname = nickname;
     }
 

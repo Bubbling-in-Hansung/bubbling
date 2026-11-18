@@ -23,7 +23,7 @@ public class ChatMessage {
 
     public static ChatMessage create(ChatRoom chatRoom, ChatMember chatMember, String message) {
         Objects.requireNonNull(chatMember, "채팅 멤버는 필수입니다.");
-        validateMessage(message);
+        message = validateMessage(message);
 
         if(!chatRoom.isActive()) {
             throw new BaseException(ChatRoomExceptionCode.ENDED);
@@ -32,11 +32,16 @@ public class ChatMessage {
         return new ChatMessage(chatRoom, chatMember, message);
     }
 
-    public static void validateMessage(String message) {
-        Objects.requireNonNull(message, "메세지는 필수입니다.");
-        if(message.isEmpty() || message.length() > 1000) {
+    public static String validateMessage(String message) {
+        Objects.requireNonNull(message, "메시지는 필수입니다.");
+
+        message = message.strip();
+
+        if (message.isEmpty() || message.length() > 1000) {
             throw new BaseException(ChatMessageExceptionCode.INVALID_MESSAGE);
         }
+
+        return message;
     }
 
     public String getId() {

@@ -34,7 +34,7 @@ public class Bubble {
     }
 
     public static Bubble create(User owner, String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen, int expireMinute) {
-        validateTitle(title);
+        title = validateTitle(title);
         Objects.requireNonNull(owner, "작성자는 필수입니다.");
         Objects.requireNonNull(category, "카테고리는 필수입니다.");
         Objects.requireNonNull(method, "대화 방식은 필수입니다.");
@@ -45,7 +45,7 @@ public class Bubble {
 
     public synchronized void update(String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen) {
         validateAlive();
-        validateTitle(title);
+        title = validateTitle(title);
         validateMaxMemberCnt(maxMemberCnt);
         Objects.requireNonNull(category, "카테고리는 필수입니다.");
         Objects.requireNonNull(method, "대화 방식은 필수입니다.");
@@ -91,11 +91,16 @@ public class Bubble {
         }
     }
 
-    private static void validateTitle(String title) {
+    private static String validateTitle(String title) {
         Objects.requireNonNull(title, "제목은 필수입니다.");
-        if(title.isEmpty() || title.length() > 50) {
+
+        title = title.strip();
+
+        if (title.isBlank() || title.length() > 50) {
             throw new BaseException(BubbleExceptionCode.INVALID_VALUE);
         }
+
+        return title;
     }
 
     public synchronized boolean isAlive() {
@@ -103,7 +108,7 @@ public class Bubble {
     }
 
     private void validateAlive() {
-        if (status != BubbleStatus.ALIVE || LocalDateTime.now().isAfter(expiresAt)) {
+        if (!isAlive()) {
             throw new BaseException(BubbleExceptionCode.EXPIRED);
         }
     }

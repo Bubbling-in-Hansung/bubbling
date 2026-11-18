@@ -44,10 +44,12 @@ public class UserService {
         );
     }
 
-    public void update(User user, String nickname, ProfileCharacter profile) {
+    public User update(User user, String nickname, ProfileCharacter profile) {
         Objects.requireNonNull(user, "사용자는 필수입니다.");
 
         user.setNickname(nickname);
         user.setProfile(profile);
+
+        return user;
     }
 }

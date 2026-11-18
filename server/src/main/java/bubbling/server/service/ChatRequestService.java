@@ -6,6 +6,8 @@ import bubbling.server.exception.code.ChatRequestExceptionCode;
 import bubbling.server.exception.code.ChatRoomExceptionCode;
 import bubbling.server.store.ChatRequestStore;
 
+import java.util.List;
+
 public class ChatRequestService {
 
     private final ChatRequestStore store;
@@ -63,5 +65,13 @@ public class ChatRequestService {
         ChatRequest chatRequest = findById(id);
         chatRequest.reject(user);
         return chatRequest;
+    }
+
+    public void deleteAllByBubble(Bubble bubble) {
+        List<String> ids = store.findAll().stream()
+                .filter(request -> request.getBubble().equals(bubble))
+                .map(ChatRequest::getId)
+                .toList();
+        store.deleteAll(ids);
     }
 }

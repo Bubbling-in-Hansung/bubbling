@@ -16,10 +16,12 @@ public class BubbleService {
 
     private final BubbleStore store;
     private final ChatRoomService chatRoomService;
+    private final ChatRequestService chatRequestService;
 
-    public BubbleService(BubbleStore bubbleStore, ChatRoomService chatRoomService) {
+    public BubbleService(BubbleStore bubbleStore, ChatRoomService chatRoomService, ChatRequestService chatRequestService) {
         this.store = bubbleStore;
         this.chatRoomService = chatRoomService;
+        this.chatRequestService = chatRequestService;
     }
 
     public Bubble create(
@@ -76,7 +78,7 @@ public class BubbleService {
     ) {
         Bubble bubble = findById(bubbleId);
 
-        if (!bubble.getOwner().getId().equals(requester.getId())) {
+        if (!bubble.getOwner().equals(requester)) {
             throw new BaseException(BubbleExceptionCode.FORBIDDEN);
         }
 
@@ -102,8 +104,12 @@ public class BubbleService {
         return bubbles;
     }
 
-    public Bubble react(String id) {
+    public Bubble react(User requester, String id) {
         Bubble bubble = findById(id);
+
+        if(bubble.getOwner().equals(requester)) {
+            throw new BaseException(BubbleExceptionCode.NOT_ALLOWED_TO_OWNER);
+        }
 
         bubble.react();
 
@@ -118,6 +124,7 @@ public class BubbleService {
         }
 
         chatRoomService.deleteByBubble(bubble);
+        chatRequestService.deleteAllByBubble(bubble);
         store.delete(bubble.getId());
 
         return bubble;

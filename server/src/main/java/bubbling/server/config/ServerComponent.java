@@ -50,8 +50,8 @@ public class ServerComponent {
         this.chatMemberService = new ChatMemberService(chatMemberStore);
         this.chatMessageService = new ChatMessageService(chatMessageStore);
         this.chatRoomService = new ChatRoomService(chatRoomStore, chatMessageService, chatMemberService, chatRequestStore);
-        this.bubbleService = new BubbleService(bubbleStore, chatRoomService);
         this.chatRequestService = new ChatRequestService(chatRequestStore, chatRoomService, chatMemberService);
+        this.bubbleService = new BubbleService(bubbleStore, chatRoomService, chatRequestService);
 
         this.bubbleExpirationScheduler = new BubbleExpirationScheduler(bubbleService, messageSender);
 
