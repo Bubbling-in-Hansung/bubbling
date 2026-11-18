@@ -5,7 +5,7 @@ import bubbling.common.enums.BubbleMethod;
 import bubbling.common.enums.BubbleStatus;
 
 public record BubbleDto(
-        String id,
+        String bubbleId,
         String title,
         BubbleCategory category,
         BubbleMethod method,

@@ -95,6 +95,7 @@ public class ChatRequestHandler {
         ChatRoomDto roomDto = ChatRoomMapper.toDto(
                 chatRoom,
                 members.size(),
+                false,
                 chatMember.getId(),
                 participants
         );

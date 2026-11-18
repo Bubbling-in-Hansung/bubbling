@@ -7,7 +7,6 @@ import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.ChatRoom;
-import bubbling.server.domain.User;
 import bubbling.server.mapper.BubbleMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.ClientRegistry;
@@ -43,7 +42,7 @@ public class SystemHandler {
     }
 
     public void init(ClientConnection connection, MessageEnvelope message) {
-        User user = connection.requireAuthenticatedUser();
+        connection.requireAuthenticatedUser();
 
         List<Bubble> bubbles = bubbleService.findAllByAlive();
         List<BubbleDto> dtos = bubbles.stream()
@@ -54,15 +53,8 @@ public class SystemHandler {
                 })
                 .toList();
 
-        String myBubbleId = bubbles.stream()
-                .filter(b -> b.getOwner().equals(user))
-                .map(Bubble::getId)
-                .findFirst()
-                .orElse(null);
-
         InitialStateDto payload = new InitialStateDto(
                 dtos,
-                myBubbleId,
                 clientRegistry.getOnlineCount()
         );
         MessageEnvelope response = new MessageEnvelope(

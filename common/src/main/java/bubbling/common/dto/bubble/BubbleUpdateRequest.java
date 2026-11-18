@@ -9,5 +9,6 @@ public record BubbleUpdateRequest(
         BubbleCategory category,
         BubbleMethod method,
         int maxMemberCnt,
-        boolean isOpen
+        boolean isOpen,
+        int expireMinute // 요청 시각으로부터 추가 됨
 ) {}
