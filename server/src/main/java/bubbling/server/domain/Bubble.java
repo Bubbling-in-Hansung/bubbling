@@ -43,18 +43,20 @@ public class Bubble {
         return new Bubble(owner, title, category, method, maxMemberCnt, isOpen, expireMinute);
     }
 
-    public synchronized void update(String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen) {
+    public synchronized void update(String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen, int expireMinute) {
         validateAlive();
         title = validateTitle(title);
         validateMaxMemberCnt(maxMemberCnt);
         Objects.requireNonNull(category, "카테고리는 필수입니다.");
         Objects.requireNonNull(method, "대화 방식은 필수입니다.");
+        validateExpireMinute(expireMinute);
 
         this.title = title;
         this.category = category;
         this.method = method;
         this.maxMemberCnt = maxMemberCnt;
         this.isOpen = isOpen;
+        this.expiresAt = LocalDateTime.now().plusMinutes(expireMinute);
     }
 
     public synchronized void react() {

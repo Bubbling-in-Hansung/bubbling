@@ -83,7 +83,8 @@ public class BubbleHandler {
                 request.category(),
                 request.method(),
                 request.maxMemberCnt(),
-                request.isOpen()
+                request.isOpen(),
+                request.expireMinute()
         );
 
         ChatRoom chatRoom = chatRoomService.findByBubble(bubble);

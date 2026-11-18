@@ -223,7 +223,8 @@ class BubbleServiceTest {
                 BubbleCategory.ETC,
                 BubbleMethod.SOLUTION,
                 2,
-                false
+                false,
+                30
         );
 
         // Then

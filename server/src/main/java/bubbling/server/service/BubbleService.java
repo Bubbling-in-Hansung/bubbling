@@ -74,7 +74,8 @@ public class BubbleService {
             BubbleCategory category,
             BubbleMethod method,
             int maxMemberCnt,
-            boolean isOpen
+            boolean isOpen,
+            int expireMinute
     ) {
         Bubble bubble = findById(bubbleId);
 
@@ -87,7 +88,8 @@ public class BubbleService {
                 category,
                 method,
                 maxMemberCnt,
-                isOpen
+                isOpen,
+                expireMinute
         );
 
         return bubble;
