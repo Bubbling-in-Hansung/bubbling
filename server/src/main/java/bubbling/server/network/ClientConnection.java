@@ -3,6 +3,8 @@ package bubbling.server.network;
 import bubbling.common.codec.JsonCodec;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.server.domain.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.Socket;
@@ -12,6 +14,8 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ClientConnection implements Runnable {
+
+    private static final Logger log = LoggerFactory.getLogger(ClientConnection.class);
 
     private final String id = UUID.randomUUID().toString();
     private final Socket socket;
@@ -69,11 +73,13 @@ public class ClientConnection implements Runnable {
             }
 
         } catch (IOException e) {
-
+            if (!closed.get()) {
+                log.warn("클라이언트 통신 오류: connectionId={}", id, e);
+            }
         } catch (IllegalArgumentException e) {
-
+            log.warn("잘못된 클라이언트 요청: connectionId={}", id, e);
         } catch (RuntimeException e) {
-
+            log.error("클라이언트 처리 중 예외 발생: connectionId={}", id, e);
         } finally {
             close();
         }
@@ -104,15 +110,33 @@ public class ClientConnection implements Runnable {
     public synchronized void authenticate(User user) {
         Objects.requireNonNull(user, "사용자는 필수입니다.");
 
-        if (closed.get()) {
-            throw new IllegalStateException("이미 종료된 연결입니다.");
+        synchronized (clientRegistry) {
+            if (closed.get()) {
+                throw new IllegalStateException("이미 종료된 연결입니다.");
+            }
+
+            if (this.user != null) {
+                throw new IllegalStateException("이미 로그인된 연결입니다.");
+            }
+
+            for (ClientConnection connection : clientRegistry.getAll()) {
+                if (connection == this || connection.isClosed()) {
+                    continue;
+                }
+
+                User authenticatedUser = connection.getUser();
+
+                if (authenticatedUser != null && authenticatedUser.getId().equals(user.getId())) {
+                    throw new IllegalStateException("다른 기기에서 로그인 중인 계정입니다.");
+                }
+            }
+
+            this.user = user;
         }
 
-        if (this.user != null) {
-            throw new IllegalStateException("이미 로그인된 연결입니다.");
+        if (!closed.get()) {
+            clientRegistry.notifyOnlineStatusChanged();
         }
-
-        this.user = user;
     }
 
     public User requireAuthenticatedUser() {
@@ -136,8 +160,8 @@ public class ClientConnection implements Runnable {
 
         try {
             socket.close();
-
         } catch (IOException e) {
+            log.warn("클라이언트 소켓 종료 실패: connectionId={}", id, e);
         } finally {
             clientRegistry.unregister(this);
         }

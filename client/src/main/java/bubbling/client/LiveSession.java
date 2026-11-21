@@ -1,0 +1,293 @@
+package bubbling.client;
+
+import bubbling.client.network.ClientMessageDispatcher;
+import bubbling.client.ui.ApplicationView;
+import bubbling.client.ui.dialog.UiErrors;
+import bubbling.client.ui.model.UiSession;
+import bubbling.common.codec.JsonCodec;
+import bubbling.common.dto.auth.LoginRequest;
+import bubbling.common.dto.auth.LoginResponse;
+import bubbling.common.dto.auth.RegisterRequest;
+import bubbling.common.dto.auth.RegisterResponse;
+import bubbling.common.dto.bubble.BubbleRemovedEvent;
+import bubbling.common.dto.chat.ChatEndResponse;
+import bubbling.common.dto.chat.ChatHistoryRequest;
+import bubbling.common.dto.chat.ChatLeftResponse;
+import bubbling.common.dto.chat.ChatMemberCountEvent;
+import bubbling.common.dto.chat.ChatMessageDto;
+import bubbling.common.dto.chat.ChatRequestDto;
+import bubbling.common.dto.chat.ChatRoomDto;
+import bubbling.common.dto.system.ExceptionResponse;
+import bubbling.common.dto.system.InitialStateDto;
+import bubbling.common.dto.system.OnlineStatusDto;
+import bubbling.common.dto.user.UserDto;
+import bubbling.common.protocol.MessageEnvelope;
+import bubbling.common.protocol.MessageType;
+
+import javax.swing.SwingUtilities;
+import javax.swing.Timer;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Consumer;
+
+import static bubbling.common.protocol.MessageType.*;
+
+/** Owns the live application protocol. All state transitions run on the EDT. */
+public final class LiveSession {
+    private static final String LOGIN_ID_FORMAT = "[A-Za-z][A-Za-z0-9]{7,31}";
+    private static final String PASSWORD_FORMAT = "(?=.*[A-Za-z])(?=.*[0-9])(?=.*[!@#$%^&*])[A-Za-z0-9!@#$%^&*]{8,64}";
+    private static final String NICKNAME_FORMAT = "[가-힣A-Za-z0-9]+(?:\\s[가-힣A-Za-z0-9]+)*";
+    private final Consumer<MessageEnvelope> transport;
+    private final JsonCodec codec = new JsonCodec();
+    private final Map<String, String> historyRequests = new HashMap<>();
+    private final Timer authenticationTimeout;
+    private ApplicationView view;
+    private UiSession state;
+    private UserDto user;
+    private boolean connected;
+    private boolean closed;
+    private String authId;
+    private MessageType authResult;
+    private String opening;
+
+    public LiveSession(Consumer<MessageEnvelope> transport) {
+        this.transport = transport;
+        authenticationTimeout = new Timer(10000, event -> disconnected("인증 응답이 없습니다. 앱을 다시 실행해 주세요."));
+        authenticationTimeout.setRepeats(false);
+    }
+
+    public void bind(ApplicationView view, UiSession state) {
+        this.view = view;
+        this.state = state;
+    }
+
+    public void registerHandlers(ClientMessageDispatcher dispatcher) {
+        on(dispatcher, LOGIN_RESULT, message -> {
+            if (!authMatches(message)) return;
+            signedIn(decode(message, LoginResponse.class).user());
+        });
+        on(dispatcher, REGISTER_RESULT, message -> {
+            if (!authMatches(message)) return;
+            signedIn(decode(message, RegisterResponse.class).user());
+        });
+        on(dispatcher, ERROR, message -> {
+            ExceptionResponse response = dispatcher.decodeError(message);
+            String detail = response.message() == null ? "서버에서 요청을 처리하지 못했습니다." : response.message();
+            if (authId != null && authId.equals(message.requestId())) {
+                finishAuthentication(detail);
+            } else {
+                clearFailedRequest(message);
+                UiErrors.show(view, new ExceptionResponse(response.code(), detail));
+            }
+        });
+        on(dispatcher, INITIAL_STATE, message -> {
+            if (user == null) return;
+            InitialStateDto snapshot = decode(message, InitialStateDto.class);
+            state.applyInitialState(snapshot);
+            view.setOnline(snapshot.onlineUserCnt());
+            view.refreshLiveState();
+        });
+        on(dispatcher, ONLINE_STATUS, message ->
+                view.setOnline(decode(message, OnlineStatusDto.class).onlineUserCnt()));
+        on(dispatcher, USER_UPDATED, message -> {
+            if (user == null) return;
+            user = decode(message, UserDto.class);
+            view.updateAccount(user);
+        });
+        for (MessageType type : new MessageType[] {BUBBLE_CREATED, BUBBLE_UPDATED}) {
+            on(dispatcher, type, message -> {
+                if (user != null) refreshRooms();
+            });
+        }
+        on(dispatcher, BUBBLE_REMOVED, message -> {
+            if (user == null) return;
+            state.markBubbleRemoved(decode(message, BubbleRemovedEvent.class));
+            view.refreshLiveState();
+            refreshRooms();
+        });
+        on(dispatcher, MY_CHAT_ROOM_LIST, message -> {
+            if (user == null) return;
+            state.applyChatRooms(decode(message, ChatRoomDto[].class));
+            view.refreshLiveState();
+        });
+        on(dispatcher, CHAT_JOINED, this::openRoom);
+        on(dispatcher, CHAT_LEFT, message -> {
+            if (user == null) return;
+            ChatLeftResponse response = decode(message, ChatLeftResponse.class);
+            state.markLeft(response.bubbleId());
+            view.returnFromChat(response.bubbleId());
+            refreshRooms();
+        });
+        on(dispatcher, CHAT_ENDED, message -> {
+            if (user == null) return;
+            state.markEnded(decode(message, ChatEndResponse.class));
+            view.refreshLiveState();
+            refreshRooms();
+        });
+        for (MessageType type : new MessageType[] {CHAT_MEMBER_JOINED, CHAT_MEMBER_LEFT}) {
+            on(dispatcher, type, message -> {
+                if (user != null) refreshRooms();
+            });
+        }
+        on(dispatcher, CHAT_MEMBER_COUNT_CHANGED, message -> {
+            if (user == null) return;
+            ChatMemberCountEvent count = decode(message, ChatMemberCountEvent.class);
+            state.updateMemberCount(count.bubbleId(), count.currentMemberCnt());
+            view.refreshLiveState();
+        });
+        for (MessageType type : new MessageType[] {CHAT_REQUESTED, CHAT_ACCEPTED, CHAT_REJECTED}) {
+            on(dispatcher, type, message -> {
+                if (user == null) return;
+                state.applyRequest(decode(message, ChatRequestDto.class));
+                view.refreshLiveState();
+            });
+        }
+        on(dispatcher, CHAT_HISTORY, message -> {
+            if (user == null) return;
+            String roomId = historyRequests.remove(message.requestId());
+            if (roomId == null) return;
+            state.applyHistory(roomId, decode(message, ChatMessageDto[].class));
+            view.refreshLiveState();
+        });
+        on(dispatcher, CHAT_MESSAGE, message -> {
+            if (user == null) return;
+            state.applyMessage(decode(message, ChatMessageDto.class));
+            view.refreshLiveState();
+        });
+    }
+
+    private void on(ClientMessageDispatcher dispatcher, MessageType type, Consumer<MessageEnvelope> handler) {
+        dispatcher.register(type, message -> SwingUtilities.invokeLater(() -> {
+            if (closed || !connected && type != ONLINE_STATUS) return;
+            try {
+                handler.accept(message);
+            } catch (RuntimeException e) {
+                System.err.println("메시지 처리 실패 (" + type + "): " + e.getClass().getSimpleName());
+                if (authMatches(message)) finishAuthentication("서버 인증 응답을 처리하지 못했습니다.");
+                clearFailedRequest(message);
+            }
+        }));
+    }
+
+    public void connected() {
+        if (closed) return;
+        connected = true;
+        view.authentication(true, "");
+    }
+
+    public void disconnected(String detail) {
+        connected = false;
+        user = null;
+        opening = null;
+        historyRequests.clear();
+        view.resetLiveState();
+        finishAuthentication(detail);
+    }
+
+    public void authenticate(boolean signup, String loginId, String password, String nickname) {
+        if (!connected || authId != null || user != null) return;
+        if (loginId.isBlank() || password.isEmpty()) {
+            view.authentication(true, "아이디와 비밀번호를 입력해 주세요.");
+            return;
+        }
+        if (signup) {
+            nickname = nickname.strip();
+            if (!loginId.matches(LOGIN_ID_FORMAT)) {
+                view.authentication(true, "아이디는 영문으로 시작하고 영문과 숫자 8~32자로 입력해 주세요.");
+                return;
+            }
+            if (!password.matches(PASSWORD_FORMAT)) {
+                view.authentication(true, "비밀번호 8~64자에 영문·숫자·특수문자를 포함해 주세요.");
+                return;
+            }
+            if (nickname.length() < 2 || nickname.length() > 32 || !nickname.matches(NICKNAME_FORMAT)) {
+                view.authentication(true, "닉네임은 한글·영문·숫자 2~32자로 입력해 주세요.");
+                return;
+            }
+        }
+        authId = UUID.randomUUID().toString();
+        authResult = signup ? REGISTER_RESULT : LOGIN_RESULT;
+        view.authentication(false, "서버에 확인 중입니다…");
+        authenticationTimeout.start();
+        transmit(signup ? REGISTER : LOGIN, authId, signup
+                ? new RegisterRequest(loginId, password, nickname)
+                : new LoginRequest(loginId, password));
+    }
+
+    private boolean authMatches(MessageEnvelope message) {
+        return authId != null && authId.equals(message.requestId()) && authResult == message.type();
+    }
+
+    private void finishAuthentication(String status) {
+        authenticationTimeout.stop();
+        authId = null;
+        authResult = null;
+        view.authentication(connected, status);
+    }
+
+    private void signedIn(UserDto account) {
+        user = Objects.requireNonNull(account);
+        finishAuthentication("");
+        view.signedIn(user);
+        refreshRooms();
+    }
+
+    public void send(MessageType type, Object payload) {
+        if (!connected || user == null) return;
+        String id = UUID.randomUUID().toString();
+        if (type == CHAT_JOIN) {
+            opening = id;
+        }
+        transmit(type, id, payload);
+    }
+
+    public void requestHistory(String roomId) {
+        if (!connected || user == null || historyRequests.containsValue(roomId)) return;
+        String id = UUID.randomUUID().toString();
+        historyRequests.put(id, roomId);
+        transmit(CHAT_HISTORY_REQUEST, id, new ChatHistoryRequest(roomId));
+    }
+
+    public void close() {
+        closed = true;
+        connected = false;
+        authenticationTimeout.stop();
+    }
+
+    private void clearFailedRequest(MessageEnvelope message) {
+        if (opening != null && opening.equals(message.requestId())) opening = null;
+        historyRequests.remove(message.requestId());
+    }
+
+    private void transmit(MessageType type, String id, Object payload) {
+        try {
+            transport.accept(new MessageEnvelope(type, id, codec.toPayload(payload)));
+        } catch (IllegalStateException e) {
+            disconnected("서버 연결이 끊겼습니다. 앱을 다시 실행해 주세요.");
+        }
+    }
+
+    private void refreshRooms() {
+        send(INITIAL_STATE_REQUEST, null);
+        send(MY_CHAT_ROOM_LIST_REQUEST, null);
+    }
+
+    private void openRoom(MessageEnvelope message) {
+        if (user == null) return;
+        ChatRoomDto chat = decode(message, ChatRoomDto.class);
+        UiSession.Room room = state.applyChatRoom(chat);
+        boolean requested = opening != null && opening.equals(message.requestId());
+        if (requested) opening = null;
+        if (requested || message.requestId() == null) {
+            view.openLiveChat(room);
+            requestHistory(chat.id());
+        }
+        view.refreshLiveState();
+    }
+
+    private <T> T decode(MessageEnvelope message, Class<T> type) {
+        return Objects.requireNonNull(codec.fromPayload(message.payload(), type));
+    }
+}
