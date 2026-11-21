@@ -60,6 +60,8 @@ public class MessageReceiver implements Runnable {
         catch (IOException e) {
             // swing UI에 종료 기반 다이얼로그 출력 필요
             System.err.println("메시지 수신 오류: " + e.getMessage());
+        } finally {
+            messageDispatcher.disconnected();
         }
     }
 }
