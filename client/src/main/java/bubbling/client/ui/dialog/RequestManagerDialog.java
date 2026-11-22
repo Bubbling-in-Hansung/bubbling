@@ -16,11 +16,14 @@ public final class RequestManagerDialog extends JDialog {
         super(owner, "참여 요청 관리", ModalityType.APPLICATION_MODAL);
         this.session = session;
         this.changed = changed;
-        JPanel body = panel(new BorderLayout(0, 16));
-        pad(body, 24);
-        body.add(title("모든 비눗방울의 참여 요청", 19), BorderLayout.NORTH);
-        body.add(scroll(rows));
-        body.add(button("닫기", false, this::dispose), BorderLayout.SOUTH);
+        ModalStyle.prepare(this);
+        JPanel body = ModalStyle.surface(16);
+        body.add(ModalStyle.header(getTitle(), "내 비눗방울에 도착한 요청을 확인하고 응답할 수 있어요.", this::dispose),
+                BorderLayout.NORTH);
+        body.add(ModalStyle.scrollContent(rows), BorderLayout.CENTER);
+        JPanel footer = panel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        footer.add(ModalStyle.action("닫기", false, this::dispose));
+        body.add(footer, BorderLayout.SOUTH);
         setContentPane(body);
         setSize(620, 480);
         ModalStyle.install(this);
@@ -33,11 +36,12 @@ public final class RequestManagerDialog extends JDialog {
                 timer.stop();
             }
         });
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
     }
 
     private void refresh() {
-        var incoming = session.requests().stream().filter(q -> q.incoming).toList();
+        var incoming = session.requests().stream()
+                .filter(q -> q.incoming && q.status != ChatRequestStatus.ACCEPTED)
+                .toList();
         String key = incoming.stream().map(q -> q.id + ":" + q.status + ":" + roomTitle(q)
                 + ":" + canAccept(q)).toList().toString();
         if (key.equals(signature)) {
@@ -46,35 +50,79 @@ public final class RequestManagerDialog extends JDialog {
         signature = key;
         rows.removeAll();
         for (var q : incoming) {
-            JPanel row = card(Color.WHITE, 24);
-            row.setLayout(new BorderLayout(10, 8));
-            pad(row, 14);
-            JPanel text = column();
-            append(text, title(roomTitle(q), 12), 6);
-            append(text, label(q.name + " · " + status(q.status), 10, MUTED), 0);
-            row.add(text);
-            JPanel actions = panel(new FlowLayout());
-            for (boolean accept : new boolean[] {
-                false, true
-            }) {
-                JButton b = button(accept ? "승인" : "거절", accept, () -> UiErrors.perform(this, () -> {
-                    session.decide(q, accept);
-                    changed.run();
-                    refresh();
-                }));
-                b.setEnabled(session.interactive() && q.status == ChatRequestStatus.PENDING
-                        && (!accept || canAccept(q)));
-                actions.add(b);
-            }
-            row.add(actions, BorderLayout.EAST);
-            row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 100));
-            append(rows, row, 10);
+            append(rows, requestCard(q), 10);
         }
-        if (rows.getComponentCount() == 0) {
-            append(rows, label("받은 참여 요청이 없어요.", 12, MUTED), 20);
+        if (incoming.isEmpty()) {
+            JPanel empty = card(color("f8f5fe"), 24);
+            empty.setLayout(new GridBagLayout());
+            JLabel message = label("받은 참여 요청이 없어요.", 12, color("736b80"));
+            message.setIcon(icon("chat"));
+            message.setIconTextGap(10);
+            empty.add(message);
+            empty.setPreferredSize(new Dimension(0, 114));
+            empty.setMaximumSize(new Dimension(Integer.MAX_VALUE, 114));
+            append(rows, empty, 0);
         }
         rows.revalidate();
         rows.repaint();
+    }
+
+    private JPanel requestCard(UiSession.Request request) {
+        JPanel row = card(color("fbfafd"), 24);
+        row.setLayout(new BorderLayout(12, 0));
+        row.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LINE, 1, true),
+                BorderFactory.createEmptyBorder(12, 12, 12, 12)));
+        JPanel avatar = card(SOFT, 16);
+        avatar.setLayout(new GridBagLayout());
+        avatar.setPreferredSize(new Dimension(42, 42));
+        avatar.add(new JLabel(icon("user")));
+        row.add(avatar, BorderLayout.WEST);
+
+        JPanel text = panel(new GridLayout(2, 1, 0, 4));
+        JLabel name = title(request.name, 12);
+        name.setToolTipText(request.name);
+        text.add(name);
+        JLabel room = label(roomTitle(request), 10, color("736b80"));
+        room.setToolTipText(room.getText());
+        text.add(room);
+        row.add(text, BorderLayout.CENTER);
+
+        JPanel actions = panel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
+        JLabel state = label(status(request.status), 10, color(switch (request.status) {
+            case PENDING -> "7052b6";
+            case ACCEPTED -> "38765e";
+            case REJECTED -> "a44660";
+            case CANCELLED -> "736b80";
+        }));
+        JPanel statusBadge = card(color(switch (request.status) {
+            case PENDING -> "f2efff";
+            case ACCEPTED -> "eaf7f0";
+            case REJECTED -> "fff0f4";
+            case CANCELLED -> "f1eef4";
+        }), 18);
+        statusBadge.setLayout(new FlowLayout(FlowLayout.CENTER, 8, 7));
+        statusBadge.add(state);
+        actions.add(statusBadge);
+        JButton reject = ModalStyle.danger("거절", () -> decide(request, false));
+        JButton accept = ModalStyle.action("승인", true, () -> decide(request, true));
+        reject.setPreferredSize(new Dimension(62, 34));
+        accept.setPreferredSize(new Dimension(62, 34));
+        boolean pending = session.interactive() && request.status == ChatRequestStatus.PENDING;
+        reject.setEnabled(pending);
+        accept.setEnabled(pending && canAccept(request));
+        actions.add(reject);
+        actions.add(accept);
+        row.add(actions, BorderLayout.EAST);
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, row.getPreferredSize().height));
+        return row;
+    }
+
+    private void decide(UiSession.Request request, boolean accept) {
+        UiErrors.perform(this, () -> {
+            session.decide(request, accept);
+            changed.run();
+            refresh();
+        });
     }
 
     private String roomTitle(UiSession.Request request) {
