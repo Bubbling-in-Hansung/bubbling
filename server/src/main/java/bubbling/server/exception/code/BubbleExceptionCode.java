@@ -9,7 +9,9 @@ public enum BubbleExceptionCode implements ExceptionCode {
     ALREADY_EXISTS("BUBBLE_004", "이미 활성화된 비눗방울이 존재합니다."),
     INVALID_VALUE("BUBBLE_005", "비눗방울 설정값이 유효하지 않습니다."),
     FAILED_TO_CREATION("BUBBLE_006", "비눗방울 생성에 실패했습니다."),
-    NOT_ALLOWED_TO_OWNER("BUBBLE-007", "본인의 비눗방울에 공감할 수 없습니다."),
+    NOT_ALLOWED_TO_OWNER("BUBBLE_007", "본인의 비눗방울에 공감할 수 없습니다."),
+    INVALID_REACTION_PERIOD("BUBBLE_008", "공감은 1분에 한 번씩 할 수 있습니다."),
+    ALREADY_EXISTS_REACTION("BUBBLE_009", "해당 비눗방울에 대한 리액션이 이미 존재합니다."),
     ;
 
     private final String code;

@@ -1,5 +1,6 @@
 package bubbling.server.service;
 
+import bubbling.common.enums.ChatRequestStatus;
 import bubbling.server.domain.*;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.ChatRequestExceptionCode;
@@ -65,6 +66,14 @@ public class ChatRequestService {
         ChatRequest chatRequest = findById(id);
         chatRequest.reject(user);
         return chatRequest;
+    }
+
+    public void cancel(Bubble bubble) {
+        List<ChatRequest> chatRequests = store.findAllByBubble(bubble);
+        for (ChatRequest chatRequest : chatRequests) {
+            if(chatRequest.getStatus() == ChatRequestStatus.PENDING)
+            chatRequest.cancel();
+        }
     }
 
     public void deleteAllByBubble(Bubble bubble) {

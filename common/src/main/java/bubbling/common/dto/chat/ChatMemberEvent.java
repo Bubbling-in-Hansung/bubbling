@@ -1,6 +1,6 @@
 package bubbling.common.dto.chat;
 
 public record ChatMemberEvent(
-        String roomId,
+        String chatRoomId,
         ChatParticipantDto participant
 ) {}

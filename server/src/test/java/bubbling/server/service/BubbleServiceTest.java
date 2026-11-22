@@ -25,6 +25,7 @@ class BubbleServiceTest {
 
     private UserStore userStore;
     private BubbleStore bubbleStore;
+    private BubbleReactionStore bubbleReactionStore;
     private ChatRoomStore chatRoomStore;
     private ChatMemberStore chatMemberStore;
     private ChatMessageStore chatMessageStore;
@@ -32,6 +33,7 @@ class BubbleServiceTest {
 
     private AuthService authService;
     private BubbleService bubbleService;
+    private BubbleReactionService bubbleReactionService;
     private ChatMemberService chatMemberService;
     private ChatRequestService chatRequestService;
 
@@ -47,6 +49,7 @@ class BubbleServiceTest {
         // Store
         userStore = new UserStore();
         bubbleStore = new BubbleStore();
+        bubbleReactionStore = new BubbleReactionStore();
         chatRoomStore = new ChatRoomStore();
         chatMemberStore = new ChatMemberStore();
         chatMessageStore = new ChatMessageStore();
@@ -73,10 +76,14 @@ class BubbleServiceTest {
                 chatMemberService
         );
 
+        bubbleReactionService = new BubbleReactionService(bubbleReactionStore);
+
         bubbleService = new BubbleService(
                 bubbleStore,
+                bubbleReactionService,
                 chatRoomService,
-                chatRequestService);
+                chatRequestService
+        );
     }
 
     @Test
@@ -223,7 +230,8 @@ class BubbleServiceTest {
                 BubbleCategory.ETC,
                 BubbleMethod.SOLUTION,
                 2,
-                false
+                false,
+                30
         );
 
         // Then

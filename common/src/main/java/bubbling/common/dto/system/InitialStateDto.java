@@ -6,6 +6,5 @@ import java.util.List;
 
 public record InitialStateDto(
         List<BubbleDto> bubbles,
-        String myBubbleId,
         int onlineUserCnt
 ) {}

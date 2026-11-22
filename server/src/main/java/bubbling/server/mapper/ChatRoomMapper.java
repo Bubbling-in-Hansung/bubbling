@@ -12,17 +12,16 @@ public class ChatRoomMapper {
     public static ChatRoomDto toDto(
             ChatRoom room,
             int currentMemberCnt,
+            boolean isOwner,
             String myMemberId,
             List<ChatParticipantDto> participants
     ) {
         return new ChatRoomDto(
                 room.getId(),
-                room.getBubble().getId(),
-                room.getBubble().getTitle(),
+                BubbleMapper.toDto(room.getBubble(), currentMemberCnt),
                 room.getStatus(),
-                room.getBubble().getMaxMemberCnt(),
-                currentMemberCnt,
                 myMemberId,
+                isOwner,
                 participants,
                 room.getCreatedAt().toString(),
                 room.getEndedAt() == null

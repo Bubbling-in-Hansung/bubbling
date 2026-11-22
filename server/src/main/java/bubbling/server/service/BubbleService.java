@@ -15,11 +15,18 @@ import java.util.List;
 public class BubbleService {
 
     private final BubbleStore store;
+    private final BubbleReactionService bubbleReactionService;
     private final ChatRoomService chatRoomService;
     private final ChatRequestService chatRequestService;
 
-    public BubbleService(BubbleStore bubbleStore, ChatRoomService chatRoomService, ChatRequestService chatRequestService) {
+    public BubbleService(
+            BubbleStore bubbleStore,
+            BubbleReactionService bubbleReactionService,
+            ChatRoomService chatRoomService,
+            ChatRequestService chatRequestService
+    ) {
         this.store = bubbleStore;
+        this.bubbleReactionService = bubbleReactionService;
         this.chatRoomService = chatRoomService;
         this.chatRequestService = chatRequestService;
     }
@@ -74,7 +81,8 @@ public class BubbleService {
             BubbleCategory category,
             BubbleMethod method,
             int maxMemberCnt,
-            boolean isOpen
+            boolean isOpen,
+            int expireMinute
     ) {
         Bubble bubble = findById(bubbleId);
 
@@ -87,7 +95,8 @@ public class BubbleService {
                 category,
                 method,
                 maxMemberCnt,
-                isOpen
+                isOpen,
+                expireMinute
         );
 
         return bubble;
@@ -98,6 +107,7 @@ public class BubbleService {
         for (Bubble bubble : store.findAll()) {
             if(bubble.expireIfElapsed(now)) {
                 bubbles.add(bubble);
+                chatRequestService.cancel(bubble);
             }
         }
 
@@ -111,6 +121,7 @@ public class BubbleService {
             throw new BaseException(BubbleExceptionCode.NOT_ALLOWED_TO_OWNER);
         }
 
+        bubbleReactionService.react(requester, bubble);
         bubble.react();
 
         return bubble;
