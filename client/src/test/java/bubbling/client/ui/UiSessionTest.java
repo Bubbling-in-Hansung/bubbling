@@ -48,4 +48,19 @@ class UiSessionTest {
   UiSession ordinary=new UiSession(false,List.of(view(true,false,1)));
   assertThrows(IllegalStateException.class,()->ordinary.send(ordinary.rooms().getFirst(),"blocked",true));
  }
+
+ @Test void previewMessageRefreshesTheCurrentDurationUntilTheBubbleExpires(){
+  Time clock = new Time();
+  UiSession session = new UiSession(true, List.of(), clock);
+  RoomView owned = view(true, false, 1);
+  var room = session.create(owned, 10);
+  session.update(room, owned, 20);
+  clock.advance(15);
+  session.send(room, "new message", true);
+  var refreshed = clock.instant().plusSeconds(20 * 60L);
+  assertEquals(refreshed, room.expiresAt);
+  clock.advance(20 * 60L);
+  session.send(room, "existing conversation", true);
+  assertEquals(refreshed, room.expiresAt);
+ }
 }

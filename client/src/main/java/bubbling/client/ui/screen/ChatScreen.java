@@ -1,5 +1,8 @@
 package bubbling.client.ui.screen;
 
+import bubbling.client.ui.dialog.ActionDialog;
+import bubbling.client.ui.dialog.NotificationCards;
+import bubbling.client.ui.dialog.RoomEditor;
 import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.drawing.MessageBubble;
 import bubbling.client.ui.model.*;
@@ -7,6 +10,8 @@ import bubbling.common.dto.chat.ChatParticipantDto;
 import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -19,7 +24,7 @@ public final class ChatScreen extends JPanel {
     private final JPanel history = column(), speech = column();
     private final JTextField input = input("캐릭터에게 따뜻한 말을 건네보세요");
     private final ActivityIndicator activityIndicator = new ActivityIndicator();
-    private final JButton send, end, leave;
+    private final JButton send, end, leave, edit;
     private JButton historyToggle;
     private JScrollPane log;
     private final boolean preview;
@@ -46,7 +51,7 @@ public final class ChatScreen extends JPanel {
         header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, color("d8d5df")),
                 BorderFactory.createEmptyBorder(12, 18, 4, 18)));
         header.setPreferredSize(new Dimension(0, 70));
-        JButton backButton = button("‹ 비눗방울 필드", false, back);
+        JButton backButton = button("‹ 홈으로", false, back);
         backButton.putClientProperty("flat", true);
         JPanel backSlot = panel(new GridBagLayout());
         GridBagConstraints backConstraints = new GridBagConstraints();
@@ -56,6 +61,7 @@ public final class ChatScreen extends JPanel {
         JPanel titleBox = column();
         append(titleBox, heading, 3);
         append(titleBox, meta, 0);
+        titleBox.setMinimumSize(new Dimension(0, titleBox.getPreferredSize().height));
         JPanel roomIdentity = panel(new GridBagLayout());
         GridBagConstraints identityConstraints = new GridBagConstraints();
         identityConstraints.gridy = 0;
@@ -64,6 +70,11 @@ public final class ChatScreen extends JPanel {
         roomIdentity.add(new RoomOrb(), identityConstraints);
         identityConstraints.insets = new Insets(0, 0, 0, 0);
         roomIdentity.add(titleBox, identityConstraints);
+        edit = button("비눗방울 수정", false, this::editBubble);
+        edit.setIcon(penIcon());
+        removeButtonOutline(edit);
+        identityConstraints.insets = new Insets(0, 8, 0, 0);
+        roomIdentity.add(edit, identityConstraints);
         header.add(roomIdentity, BorderLayout.CENTER);
         JPanel actions = panel(new GridBagLayout());
         JPanel actionRow = panel(new FlowLayout(FlowLayout.RIGHT, 7, 0));
@@ -83,6 +94,16 @@ public final class ChatScreen extends JPanel {
         scene.add(speech);
         PrivacyNotice privacyNotice = new PrivacyNotice();
         scene.add(privacyNotice);
+        scene.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                if (SwingUtilities.isLeftMouseButton(event) && current != null && current.joined && !current.ended) {
+                    scene.moveOwnCharacter(event.getPoint());
+                    layoutSpeech(scene.getWidth(), scene.getHeight());
+                    speech.repaint();
+                }
+            }
+        });
         scene.addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentResized(java.awt.event.ComponentEvent e) {
                 layoutSpeech(scene.getWidth(), scene.getHeight());
@@ -118,17 +139,22 @@ public final class ChatScreen extends JPanel {
         historyToggle.setSelected(true);
         actionRow.add(historyToggle);
         end = button("대화 종료", false, () -> {
-            if (confirm(preview ? "대화방을 종료하고 목록에서 삭제할까요?" : "대화를 종료할까요?")) {
-                session.end(current);
+            UiSession.Room target = current;
+            if (target != null && ActionDialog.confirm(this,
+                    preview ? "대화방을 종료하고 목록에서 삭제할까요?" : "대화를 종료할까요?", "종료")
+                    && target == current && target.joined && !target.ended) {
+                session.end(target);
                 if (preview) {
-                    session.remove(current);
+                    session.remove(target);
                     back.run();
                 }
             }
         });
         leave = button("퇴장", false, () -> {
-            if (confirm("대화방에서 나갈까요?")) {
-                session.leave(current);
+            UiSession.Room target = current;
+            if (target != null && ActionDialog.confirm(this, "대화방에서 나갈까요?", "퇴장")
+                    && target == current && target.joined && !target.ended) {
+                session.leave(target);
                 if (preview) {
                     refresh();
                     back.run();
@@ -213,7 +239,10 @@ public final class ChatScreen extends JPanel {
             }
         });
         timer = new javax.swing.Timer(200, e -> renderSpeech());
-        activityTimer = new javax.swing.Timer(1000, e -> updateActivityIndicator());
+        activityTimer = new javax.swing.Timer(1000, e -> {
+            updateActivityIndicator();
+            edit.setEnabled(canEditBubble());
+        });
         addHierarchyListener(e -> {
             if (isShowing()) {
                 timer.start();
@@ -231,32 +260,51 @@ public final class ChatScreen extends JPanel {
     }
 
     public void showRoom(RoomView selected) {
-        room = selected;
-        current = session.find(room);
-        if (current == null) {
+        UiSession.Room next = session.find(selected);
+        if (next == null) {
             throw new IllegalArgumentException("Unknown room");
         }
+        if (current != next) scene.resetOwnPosition();
+        room = selected;
+        current = next;
         if (session.live()) {
             input.setText("");
             refreshLive();
             return;
         }
-        heading.setText(room.title());
-        meta.setText((room.mode() == null ? "" : room.mode() + " · ") + current.people + " / " + room.capacity() + "명 · "
-                + (room.privateRoom() ? "비공개" : "공개"));
+        updateRoomHeading();
         refresh();
     }
 
     public void refreshLive() {
         if (current == null || current.conversation == null) return;
-        room = current.view;
         var conversation = current.conversation;
-        heading.setText(conversation.bubbleTitle());
-        String count = current.people + " / " + conversation.maxMemberCnt() + "명";
-        meta.setText(room.mode() == null ? count : room.mode() + " · " + count + " · "
-                + (room.privateRoom() ? "비공개" : "공개"));
+        updateRoomHeading();
         scene.showParticipants(current.ended ? List.of() : current.participants(), conversation.myMemberId());
         refresh();
+    }
+
+    private void updateRoomHeading() {
+        if (current == null) return;
+        room = current.view;
+        heading.setText(room.title());
+        heading.setToolTipText(room.title());
+        String count = current.people + " / " + room.capacity() + "명";
+        meta.setText(room.mode() == null ? count : room.mode() + " · " + count + " · "
+                + (room.privateRoom() ? "비공개" : "공개"));
+    }
+
+    private void editBubble() {
+        if (!canEditBubble()) return;
+        new RoomEditor(SwingUtilities.getWindowAncestor(this), current.view, session, () -> {
+            updateRoomHeading();
+            refresh();
+        }).setVisible(true);
+    }
+
+    private boolean canEditBubble() {
+        return session.interactive() && current != null && current.view.owner() && !current.ended && !current.removed
+                && (current.expiresAt == null || current.expiresAt.isAfter(session.now()));
     }
 
     public boolean isShowingRoom(String bubbleId) {
@@ -267,12 +315,9 @@ public final class ChatScreen extends JPanel {
         current = null;
         room = null;
         input.setText("");
+        scene.resetOwnPosition();
         scene.showParticipants(List.of(), null);
         refresh();
-    }
-
-    private boolean confirm(String message) {
-        return current != null && JOptionPane.showConfirmDialog(this, message, "확인", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION;
     }
 
     private void send() {
@@ -281,8 +326,9 @@ public final class ChatScreen extends JPanel {
         }
         if (!MessageText.acceptsInput(input.getText()) || MessageText.lines(input.getText(), input.getFontMetrics(font(11,
                 false))::stringWidth, MessageBubble.MAX_WIDTH - 24).size() > MessageText.MAX_LINES) {
-            JOptionPane.showMessageDialog(this, "메시지는 공백 포함 " + MessageText.MAX_LENGTH + "자, 최대 " + MessageText.MAX_LINES
-                    + "줄까지 입력할 수 있어요.", "입력 확인", JOptionPane.INFORMATION_MESSAGE);
+            NotificationCards.info(this, "메시지 입력 안내",
+                    "메시지는 공백 포함 " + MessageText.MAX_LENGTH + "자, 최대 " + MessageText.MAX_LINES
+                    + "줄까지 입력할 수 있어요.");
             return;
         }
         session.send(current, input.getText(), true);
@@ -295,9 +341,12 @@ public final class ChatScreen extends JPanel {
         boolean owner = room != null && room.owner();
         send.setEnabled(enabled);
         input.setEnabled(enabled);
-        leave.setEnabled(enabled && (preview || !owner));
+        leave.setVisible(!owner);
+        leave.setEnabled(enabled && !owner);
         end.setVisible(owner);
         end.setEnabled(enabled && owner);
+        edit.setVisible(owner);
+        edit.setEnabled(canEditBubble());
         updateActivityIndicator();
         renderHistory();
         renderSpeech();
@@ -373,7 +422,7 @@ public final class ChatScreen extends JPanel {
         List<List<UiSession.Message>> messages = List.of();
         if (current != null && session.live() && current.conversation != null && !current.ended) {
             messages = current.participants().stream().limit(4)
-                    .map(ChatParticipantDto::memberId).map(id -> session.speech(current, id)).toList();
+                    .map(ChatParticipantDto::chatMemberId).map(id -> session.speech(current, id)).toList();
         } else if (current != null && preview) {
             messages = List.of(session.speech(current, "익명의 고래"), session.speech(current, "달빛 구름"));
         }
@@ -416,9 +465,12 @@ public final class ChatScreen extends JPanel {
         for (int i = 0; i < speech.getComponentCount(); i++) {
             Component stack = speech.getComponent(i);
             Point head = scene.participantHead(i);
+            int below = scene.participantBottom(head) + 8;
+            boolean placeBelow = head.y < 95 && height - below > head.y;
             if (stack instanceof Container container) {
                 int bubbleCount = (int) java.util.Arrays.stream(container.getComponents()).filter(MessageBubble.class::isInstance).count();
-                int budget = Math.max(1, (head.y - 20 - Math.max(0, bubbleCount - 1) * 7) / Math.max(1, bubbleCount));
+                int space = placeBelow ? height - below : head.y - 20;
+                int budget = Math.max(1, (space - Math.max(0, bubbleCount - 1) * 7) / Math.max(1, bubbleCount));
                 for (Component child : container.getComponents()) {
                     if (child instanceof MessageBubble bubble) {
                         bubble.setAvailableHeight(budget);
@@ -426,7 +478,9 @@ public final class ChatScreen extends JPanel {
                 }
             }
             Dimension size = stack.getPreferredSize();
-            stack.setBounds(head.x - size.width / 2, Math.max(0, head.y - size.height - 10), size.width, size.height);
+            int x = Math.clamp(head.x - size.width / 2, 0, Math.max(0, width - size.width));
+            int y = placeBelow ? below : Math.max(0, head.y - size.height - 10);
+            stack.setBounds(x, y, size.width, size.height);
             if (stack instanceof Container container) {
                 container.doLayout();
                 for (Component child : container.getComponents()) {

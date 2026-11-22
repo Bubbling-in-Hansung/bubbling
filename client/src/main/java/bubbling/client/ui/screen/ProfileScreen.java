@@ -2,9 +2,12 @@ package bubbling.client.ui.screen;
 
 import bubbling.client.ui.model.*;
 import bubbling.client.ui.drawing.*;
+import bubbling.client.ui.dialog.CharacterPickerDialog;
 import bubbling.common.dto.user.UserDto;
+import bubbling.common.enums.ProfileCharacter;
 import javax.swing.*;
 import java.awt.*;
+import java.util.function.Consumer;
 import static bubbling.client.ui.style.Styles.*;
 
 public final class ProfileScreen extends JPanel {
@@ -15,12 +18,15 @@ public final class ProfileScreen extends JPanel {
         }
     };
     private final UiSession session;
+    private final Consumer<ProfileCharacter> saveProfile;
+    private boolean signedIn;
     private final JLabel spaceTitle;
     private final JLabel accountId = label("", 9, INK);
     private final JLabel accountNickname = label("", 9, INK);
     private final JLabel createdAt = label("", 9, INK);
-    public ProfileScreen(UiData data) {
+    public ProfileScreen(UiData data, Consumer<ProfileCharacter> saveProfile) {
         super(new BorderLayout());
+        this.saveProfile = saveProfile;
         content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
         content.setOpaque(false);
         session = data.session();
@@ -72,6 +78,7 @@ public final class ProfileScreen extends JPanel {
     }
 
     public void setAccount(UserDto user) {
+        signedIn = user != null;
         spaceTitle.setText(user == null ? "나의 공간" : user.nickname() + "님의 공간");
         accountId.setText("   계정 아이디     " + (user == null ? "—" : user.loginId()));
         accountNickname.setText("   계정 닉네임     " + (user == null ? "—" : user.nickname()));
@@ -79,10 +86,15 @@ public final class ProfileScreen extends JPanel {
     }
 
     private void characters() {
-        new bubbling.client.ui.dialog.CharacterPickerDialog(SwingUtilities.getWindowAncestor(this), session.character(),
-                session.preview(), value -> {
-            session.character(value);
-            SwingUtilities.getWindowAncestor(this).repaint();
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        new CharacterPickerDialog(owner, session.character(),
+                session.preview() || signedIn && saveProfile != null, value -> {
+            if (session.preview()) {
+                session.character(value);
+                if (owner != null) owner.repaint();
+            } else {
+                saveProfile.accept(CharacterChoice.at(value).profile());
+            }
         }).setVisible(true);
     }
 }

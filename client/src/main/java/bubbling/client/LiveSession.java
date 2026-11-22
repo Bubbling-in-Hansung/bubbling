@@ -9,10 +9,11 @@ import bubbling.common.dto.auth.LoginRequest;
 import bubbling.common.dto.auth.LoginResponse;
 import bubbling.common.dto.auth.RegisterRequest;
 import bubbling.common.dto.auth.RegisterResponse;
+import bubbling.common.dto.bubble.BubbleDto;
 import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.chat.ChatEndResponse;
 import bubbling.common.dto.chat.ChatHistoryRequest;
-import bubbling.common.dto.chat.ChatLeftResponse;
+import bubbling.common.dto.chat.ChatLeaveRequest;
 import bubbling.common.dto.chat.ChatMemberCountEvent;
 import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.common.dto.chat.ChatRequestDto;
@@ -21,6 +22,10 @@ import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.system.OnlineStatusDto;
 import bubbling.common.dto.user.UserDto;
+import bubbling.common.dto.user.UserUpdateRequest;
+import bubbling.common.enums.ChatRequestRole;
+import bubbling.common.enums.ChatRequestStatus;
+import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 
@@ -42,6 +47,7 @@ public final class LiveSession {
     private final Consumer<MessageEnvelope> transport;
     private final JsonCodec codec = new JsonCodec();
     private final Map<String, String> historyRequests = new HashMap<>();
+    private final Map<String, String> leaveRequests = new HashMap<>();
     private final Timer authenticationTimeout;
     private ApplicationView view;
     private UiSession state;
@@ -75,6 +81,7 @@ public final class LiveSession {
         on(dispatcher, ERROR, message -> {
             ExceptionResponse response = dispatcher.decodeError(message);
             String detail = response.message() == null ? "서버에서 요청을 처리하지 못했습니다." : response.message();
+            System.err.println("[ERROR] " + detail);
             if (authId != null && authId.equals(message.requestId())) {
                 finishAuthentication(detail);
             } else {
@@ -91,16 +98,17 @@ public final class LiveSession {
         });
         on(dispatcher, ONLINE_STATUS, message ->
                 view.setOnline(decode(message, OnlineStatusDto.class).onlineUserCnt()));
-        on(dispatcher, USER_UPDATED, message -> {
-            if (user == null) return;
-            user = decode(message, UserDto.class);
-            view.updateAccount(user);
+        on(dispatcher, USER_INFO, this::applyAccount);
+        on(dispatcher, USER_UPDATED, this::applyAccount);
+        on(dispatcher, BUBBLE_CREATED, message -> {
+            if (user != null) refreshRooms();
         });
-        for (MessageType type : new MessageType[] {BUBBLE_CREATED, BUBBLE_UPDATED}) {
-            on(dispatcher, type, message -> {
-                if (user != null) refreshRooms();
-            });
-        }
+        on(dispatcher, BUBBLE_UPDATED, message -> {
+            if (user == null) return;
+            state.applyBubble(decode(message, BubbleDto.class));
+            view.refreshLiveState();
+            refreshRooms();
+        });
         on(dispatcher, BUBBLE_REMOVED, message -> {
             if (user == null) return;
             state.markBubbleRemoved(decode(message, BubbleRemovedEvent.class));
@@ -115,14 +123,17 @@ public final class LiveSession {
         on(dispatcher, CHAT_JOINED, this::openRoom);
         on(dispatcher, CHAT_LEFT, message -> {
             if (user == null) return;
-            ChatLeftResponse response = decode(message, ChatLeftResponse.class);
-            state.markLeft(response.bubbleId());
-            view.returnFromChat(response.bubbleId());
+            String bubbleId = leaveRequests.remove(message.requestId());
+            if (bubbleId == null) return;
+            state.markLeft(bubbleId);
+            view.returnFromChat(bubbleId);
             refreshRooms();
         });
         on(dispatcher, CHAT_ENDED, message -> {
             if (user == null) return;
-            state.markEnded(decode(message, ChatEndResponse.class));
+            ChatEndResponse response = decode(message, ChatEndResponse.class);
+            state.markEnded(response);
+            view.returnFromChat(response.bubbleId());
             view.refreshLiveState();
             refreshRooms();
         });
@@ -140,7 +151,12 @@ public final class LiveSession {
         for (MessageType type : new MessageType[] {CHAT_REQUESTED, CHAT_ACCEPTED, CHAT_REJECTED}) {
             on(dispatcher, type, message -> {
                 if (user == null) return;
-                state.applyRequest(decode(message, ChatRequestDto.class));
+                ChatRequestDto request = decode(message, ChatRequestDto.class);
+                boolean added = state.applyRequest(request);
+                if (added && type == CHAT_REQUESTED && request.role() == ChatRequestRole.OWNER
+                        && request.status() == ChatRequestStatus.PENDING) {
+                    view.requestReceived(request.bubbleId());
+                }
                 view.refreshLiveState();
             });
         }
@@ -153,19 +169,24 @@ public final class LiveSession {
         });
         on(dispatcher, CHAT_MESSAGE, message -> {
             if (user == null) return;
-            state.applyMessage(decode(message, ChatMessageDto.class));
+            var room = state.applyMessage(decode(message, ChatMessageDto.class));
+            if (room != null && message.requestId() == null) {
+                view.chatMessageReceived(room);
+            }
             view.refreshLiveState();
         });
     }
 
-    private void on(ClientMessageDispatcher dispatcher, MessageType type, Consumer<MessageEnvelope> handler) {
+    private void on(ClientMessageDispatcher dispatcher, MessageType type, ClientMessageDispatcher.Command handler) {
         dispatcher.register(type, message -> SwingUtilities.invokeLater(() -> {
             if (closed || !connected && type != ONLINE_STATUS) return;
             try {
-                handler.accept(message);
+                handler.execute(message);
             } catch (RuntimeException e) {
-                System.err.println("메시지 처리 실패 (" + type + "): " + e.getClass().getSimpleName());
-                if (authMatches(message)) finishAuthentication("서버 인증 응답을 처리하지 못했습니다.");
+                dispatcher.reportFailure(type, e);
+                if (authId != null && authId.equals(message.requestId())) {
+                    disconnected("서버 인증 응답을 처리하지 못했습니다. 앱을 다시 실행해 주세요.");
+                }
                 clearFailedRequest(message);
             }
         }));
@@ -182,6 +203,7 @@ public final class LiveSession {
         user = null;
         opening = null;
         historyRequests.clear();
+        leaveRequests.clear();
         view.resetLiveState();
         finishAuthentication(detail);
     }
@@ -234,11 +256,30 @@ public final class LiveSession {
         refreshRooms();
     }
 
+    private void applyAccount(MessageEnvelope message) {
+        if (user == null) return;
+        user = decode(message, UserDto.class);
+        view.updateAccount(user);
+    }
+
+    public void requestAccount() {
+        send(USER_INFO_REQUEST, null);
+    }
+
+    public void updateProfile(ProfileCharacter profile) {
+        if (user != null) {
+            send(USER_UPDATE, new UserUpdateRequest(user.nickname(), profile));
+        }
+    }
+
     public void send(MessageType type, Object payload) {
         if (!connected || user == null) return;
         String id = UUID.randomUUID().toString();
         if (type == CHAT_JOIN) {
             opening = id;
+        }
+        if (type == CHAT_LEAVE && payload instanceof ChatLeaveRequest request) {
+            leaveRequests.put(id, request.bubbleId());
         }
         transmit(type, id, payload);
     }
@@ -253,12 +294,14 @@ public final class LiveSession {
     public void close() {
         closed = true;
         connected = false;
+        leaveRequests.clear();
         authenticationTimeout.stop();
     }
 
     private void clearFailedRequest(MessageEnvelope message) {
         if (opening != null && opening.equals(message.requestId())) opening = null;
         historyRequests.remove(message.requestId());
+        leaveRequests.remove(message.requestId());
     }
 
     private void transmit(MessageType type, String id, Object payload) {
@@ -280,9 +323,15 @@ public final class LiveSession {
         UiSession.Room room = state.applyChatRoom(chat);
         boolean requested = opening != null && opening.equals(message.requestId());
         if (requested) opening = null;
-        if (requested || message.requestId() == null) {
+        if (requested) {
             view.openLiveChat(room);
-            requestHistory(chat.id());
+            requestHistory(chat.chatRoomId());
+        } else if (message.requestId() == null && room.joined) {
+            var request = state.outgoing(room);
+            if (request != null && request.status == ChatRequestStatus.PENDING) {
+                request.status = ChatRequestStatus.ACCEPTED;
+            }
+            view.requestApproved(chat.myMemberId(), room);
         }
         view.refreshLiveState();
     }

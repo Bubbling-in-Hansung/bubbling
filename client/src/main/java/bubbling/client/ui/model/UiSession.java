@@ -1,20 +1,19 @@
 package bubbling.client.ui.model;
 
+import bubbling.client.service.SessionRequests;
 import bubbling.common.enums.ChatRequestStatus;
 import bubbling.common.enums.ChatRequestRole;
-import bubbling.common.dto.bubble.*;
+import bubbling.common.dto.bubble.BubbleDto;
+import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.chat.*;
 import bubbling.common.dto.system.InitialStateDto;
-import bubbling.common.enums.BubbleCategory;
-import bubbling.common.enums.BubbleMethod;
 import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRoomStatus;
+import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageType;
 import java.time.*;
 import java.util.*;
 import java.util.function.BiConsumer;
-
-import static bubbling.common.protocol.MessageType.*;
 
 /** Presentation state used by the memory preview and live screens. */
 public final class UiSession {
@@ -30,6 +29,7 @@ public final class UiSession {
         public boolean visited;
         public boolean listed;
         public Instant expiresAt;
+        private int previewExpirationMinutes = 30;
         public ChatRoomDto conversation;
         private String myMemberId;
         public int historyRevision;
@@ -41,7 +41,7 @@ public final class UiSession {
             this.view = view;
             people = view.people();
             joined = view.owner();
-            expiresAt = view.expired() ? now : now.plusSeconds(1800);
+            expiresAt = view.expired() ? now : now.plusSeconds(previewExpirationMinutes * 60L);
         }
 
         public List<ChatParticipantDto> participants() {
@@ -70,7 +70,7 @@ public final class UiSession {
     }
 
     private final boolean preview;
-    private final BiConsumer<MessageType, Object> transport;
+    private final SessionRequests liveRequests;
     private final Clock clock;
     private final LinkedHashMap<String, Room> rooms = new LinkedHashMap<>();
     private final List<Request> requests = new ArrayList<>();
@@ -90,7 +90,7 @@ public final class UiSession {
     UiSession(boolean preview, List<RoomView> views, Clock clock, BiConsumer<MessageType, Object> transport) {
         this.preview = preview;
         this.clock = clock;
-        this.transport = transport;
+        liveRequests = transport == null ? null : new SessionRequests(transport);
         int i = 0;
         for (var v : views) {
             var room = new Room("preview-" + i++, v, clock.instant());
@@ -107,7 +107,7 @@ public final class UiSession {
     }
 
     public boolean live() {
-        return transport != null;
+        return liveRequests != null;
     }
 
     public boolean interactive() {
@@ -115,33 +115,33 @@ public final class UiSession {
     }
 
     public void applyInitialState(InitialStateDto snapshot) {
-        if (snapshot.myBubbleId() != null) ownedBubbles.add(snapshot.myBubbleId());
         Set<String> visible = new HashSet<>();
         for (BubbleDto bubble : snapshot.bubbles()) {
-            visible.add(bubble.id());
-            int hash = bubble.id().hashCode();
-            var view = new RoomView(bubble.title(), bubble.category().getLabel(),
-                    ConversationMode.valueOf(bubble.method().name()).label(), bubble.currentMemberCnt(),
-                    bubble.maxMemberCnt(), !bubble.isOpen(), bubble.status() == BubbleStatus.EXPIRED,
-                    ownedBubbles.contains(bubble.id()), Math.floorMod(hash, CharacterChoice.count()),
-                    .15 + Math.floorMod(hash, 100) / 150.0, .15 + Math.floorMod(hash >>> 8, 100) / 150.0, 152);
-            var room = rooms.computeIfAbsent(bubble.id(), id -> new Room(id, view, now()));
-            room.view = view;
-            room.expiresAt = timestamp(bubble.expiresAt());
-            room.people = bubble.currentMemberCnt();
-            room.removed = bubble.status() != BubbleStatus.ALIVE;
+            visible.add(bubble.bubbleId());
+            applyBubble(bubble);
         }
         rooms.values().stream().filter(room -> !visible.contains(room.bubbleId)).forEach(room -> room.removed = true);
     }
 
+    public Room applyBubble(BubbleDto bubble) {
+        String bubbleId = bubble.bubbleId();
+        int hash = bubbleId.hashCode();
+        var view = new RoomView(bubble.title(), bubble.category().getLabel(),
+                ConversationMode.valueOf(bubble.method().name()).label(), bubble.currentMemberCnt(),
+                bubble.maxMemberCnt(), !bubble.isOpen(), bubble.status() == BubbleStatus.EXPIRED,
+                ownedBubbles.contains(bubbleId), Math.floorMod(hash, CharacterChoice.count()),
+                .15 + Math.floorMod(hash, 100) / 150.0, .15 + Math.floorMod(hash >>> 8, 100) / 150.0, 152);
+        var room = rooms.computeIfAbsent(bubbleId, id -> new Room(id, view, now()));
+        if (!room.view.equals(view)) room.view = view;
+        room.expiresAt = timestamp(bubble.expiresAt());
+        room.people = bubble.currentMemberCnt();
+        room.removed = bubble.status() != BubbleStatus.ALIVE;
+        return room;
+    }
+
     public Room applyChatRoom(ChatRoomDto chat) {
-        var room = rooms.computeIfAbsent(chat.bubbleId(), id -> {
-            var view = new RoomView(chat.bubbleTitle(), null, null, chat.currentMemberCnt(), chat.maxMemberCnt(),
-                    false, false, ownedBubbles.contains(id), 0, .35, .3, 152);
-            var result = new Room(id, view, now());
-            result.removed = true;
-            return result;
-        });
+        if (chat.isOwner()) ownedBubbles.add(chat.bubble().bubbleId());
+        var room = applyBubble(chat.bubble());
         if (chat.myMemberId() != null && !chat.myMemberId().equals(room.myMemberId)) {
             room.myMemberId = chat.myMemberId();
             rebuildHistory(room);
@@ -150,7 +150,6 @@ public final class UiSession {
         room.listed = true;
         room.joined = chat.status() == ChatRoomStatus.ACTIVE && chat.myMemberId() != null;
         room.ended = chat.status() == ChatRoomStatus.ENDED;
-        room.people = chat.currentMemberCnt();
         return room;
     }
 
@@ -170,7 +169,7 @@ public final class UiSession {
     }
 
     public void markEnded(ChatEndResponse response) {
-        Room room = chatRoom(response.roomId());
+        Room room = chatRoom(response.chatRoomId());
         if (room == null) return;
         room.ended = true;
         room.joined = false;
@@ -178,10 +177,18 @@ public final class UiSession {
     }
 
     public void markBubbleRemoved(BubbleRemovedEvent event) {
+        if (event.status() == BubbleStatus.EXPIRED) {
+            for (Request request : requests) {
+                if (request.roomId.equals(event.bubbleId()) && request.status == ChatRequestStatus.PENDING) {
+                    request.status = ChatRequestStatus.CANCELLED;
+                }
+            }
+        }
         Room room = rooms.get(event.bubbleId());
         if (room == null) return;
         room.removed = true;
         if (event.status() == BubbleStatus.DELETED) {
+            ownedBubbles.remove(event.bubbleId());
             room.joined = false;
             room.listed = false;
             room.ended = room.conversation != null;
@@ -194,11 +201,12 @@ public final class UiSession {
         if (room != null) room.people = count;
     }
 
-    public void applyRequest(ChatRequestDto response) {
+    public boolean applyRequest(ChatRequestDto response) {
         boolean incoming = response.role() == ChatRequestRole.OWNER;
-        var request = requests.stream().filter(item -> item.id.equals(response.id())).findFirst().orElse(null);
-        if (request == null) {
-            request = new Request(response.id(), response.bubbleId(),
+        var request = requests.stream().filter(item -> item.id.equals(response.chatRequestId())).findFirst().orElse(null);
+        boolean added = request == null;
+        if (added) {
+            request = new Request(response.chatRequestId(), response.bubbleId(),
                     Objects.toString(response.requesterNickname(), "참여 요청"), incoming);
             requests.add(request);
         }
@@ -207,6 +215,7 @@ public final class UiSession {
         } else {
             request.status = response.status();
         }
+        return added;
     }
 
     public void applyHistory(String roomId, ChatMessageDto[] history) {
@@ -214,7 +223,7 @@ public final class UiSession {
         if (room == null) return;
         Map<String, ChatMessageDto> ordered = new LinkedHashMap<>();
         for (ChatMessageDto message : history) {
-            if (roomId.equals(message.chatRoomId())) ordered.putIfAbsent(message.id(), message);
+            if (roomId.equals(message.chatRoomId())) ordered.putIfAbsent(message.chatMessageId(), message);
         }
         room.received.forEach(ordered::putIfAbsent);
         room.received.clear();
@@ -222,14 +231,15 @@ public final class UiSession {
         rebuildHistory(room);
     }
 
-    public void applyMessage(ChatMessageDto message) {
+    public Room applyMessage(ChatMessageDto message) {
         Room room = chatRoom(message.chatRoomId());
-        if (room == null || room.received.putIfAbsent(message.id(), message) != null) return;
+        if (room == null || room.received.putIfAbsent(message.chatMessageId(), message) != null) return null;
         room.messages.add(messageView(room, message));
+        return room;
     }
 
     private Room chatRoom(String chatId) {
-        return rooms.values().stream().filter(room -> room.conversation != null && room.conversation.id().equals(chatId))
+        return rooms.values().stream().filter(room -> room.conversation != null && room.conversation.chatRoomId().equals(chatId))
                 .findFirst().orElse(null);
     }
 
@@ -313,7 +323,7 @@ public final class UiSession {
             return;
         }
         if (live()) {
-            transport.accept(CHAT_REQUEST, new ChatRequestCreateRequest(r.bubbleId));
+            liveRequests.requestChat(r.bubbleId);
             return;
         }
         writable();
@@ -330,7 +340,7 @@ public final class UiSession {
             if (accept && (r == null || hidden(r))) {
                 throw new IllegalStateException("지금은 이 방의 요청을 승인할 수 없어요.");
             }
-            transport.accept(accept ? CHAT_ACCEPT : CHAT_REJECT, new ChatRequestDecisionRequest(q.id));
+            liveRequests.decideChat(q.id, accept);
             return;
         }
         writable();
@@ -371,7 +381,7 @@ public final class UiSession {
 
     public void openLiveRoom(Room room) {
         if (!canOpen(room)) return;
-        transport.accept(CHAT_JOIN, new ChatJoinRequest(room.bubbleId));
+        liveRequests.joinChat(room.bubbleId);
     }
 
     public void enter(Room r) {
@@ -403,7 +413,7 @@ public final class UiSession {
 
     public void leave(Room r) {
         if (live()) {
-            transport.accept(CHAT_LEAVE, new ChatLeaveRequest(r.bubbleId));
+            liveRequests.leaveChat(r.bubbleId);
             return;
         }
         writable();
@@ -415,7 +425,7 @@ public final class UiSession {
 
     public void end(Room r) {
         if (live()) {
-            transport.accept(CHAT_END, new ChatEndRequest(r.conversation.id()));
+            liveRequests.endChat(r.conversation.chatRoomId());
             return;
         }
         writable();
@@ -430,7 +440,7 @@ public final class UiSession {
 
     public void send(Room r, String text, boolean mine) {
         if (live()) {
-            transport.accept(CHAT_MESSAGE, new ChatMessageRequest(r.conversation.id(), text.strip()));
+            liveRequests.sendMessage(r.conversation.chatRoomId(), text);
             return;
         }
         writable();
@@ -440,7 +450,11 @@ public final class UiSession {
         if (text == null || text.isBlank()) {
             return;
         }
-        r.messages.add(new Message(mine ? "익명의 고래" : "달빛 구름", text.strip(), mine, now()));
+        Instant sentAt = now();
+        r.messages.add(new Message(mine ? "익명의 고래" : "달빛 구름", text.strip(), mine, sentAt));
+        if (!r.removed && r.expiresAt != null && r.expiresAt.isAfter(sentAt)) {
+            r.expiresAt = sentAt.plusSeconds(r.previewExpirationMinutes * 60L);
+        }
     }
 
     public List<Message> speech(Room r, String sender) {
@@ -453,6 +467,10 @@ public final class UiSession {
         return character;
     }
 
+    public void applyProfile(ProfileCharacter profile) {
+        character = CharacterChoice.indexOf(profile);
+    }
+
     public void character(int value) {
         writable();
         character = Math.floorMod(value, CharacterChoice.count());
@@ -460,12 +478,12 @@ public final class UiSession {
 
     public Room create(RoomView view, int minutes) {
         if (live()) {
-            transport.accept(BUBBLE_CREATE, new BubbleCreateRequest(view.title(), category(view), method(view),
-                    view.capacity(), !view.privateRoom(), minutes));
+            liveRequests.createBubble(view, minutes);
             return null;
         }
         writable();
         Room r = new Room(UUID.randomUUID().toString(), view, now());
+        r.previewExpirationMinutes = minutes;
         r.expiresAt = now().plusSeconds(minutes * 60L);
         rooms.put(r.id, r);
         recent = r.id;
@@ -474,8 +492,7 @@ public final class UiSession {
 
     public void update(Room r, RoomView view, int minutes) {
         if (live()) {
-            transport.accept(BUBBLE_UPDATE, new BubbleUpdateRequest(r.bubbleId, view.title(), category(view),
-                    method(view), view.capacity(), !view.privateRoom()));
+            liveRequests.updateBubble(r.bubbleId, view, minutes);
             return;
         }
         writable();
@@ -483,13 +500,14 @@ public final class UiSession {
             throw new IllegalStateException("내 비눗방울만 수정할 수 있어요.");
         }
         r.view = view;
+        r.previewExpirationMinutes = minutes;
         r.expiresAt = now().plusSeconds(minutes * 60L);
         tick();
     }
 
     public void remove(Room r) {
         if (live()) {
-            transport.accept(BUBBLE_DELETE, new BubbleDeleteRequest(r.bubbleId));
+            liveRequests.deleteBubble(r.bubbleId);
             return;
         }
         writable();
@@ -506,13 +524,4 @@ public final class UiSession {
         }
     }
 
-    private BubbleCategory category(RoomView view) {
-        return Arrays.stream(BubbleCategory.values()).filter(category -> category.getLabel().equals(view.category()))
-                .findFirst().orElseThrow();
-    }
-
-    private BubbleMethod method(RoomView view) {
-        return Arrays.stream(ConversationMode.values()).filter(mode -> mode.label().equals(view.mode()))
-                .findFirst().orElseThrow().method();
-    }
 }

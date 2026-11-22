@@ -1,7 +1,6 @@
 package bubbling.client.ui.dialog;
 
 import bubbling.client.ui.model.*;
-import bubbling.client.ui.style.UiFonts;
 import bubbling.common.enums.BubbleCategory;
 import javax.swing.*;
 import java.awt.*;
@@ -24,13 +23,9 @@ public final class RoomEditor extends JDialog {
 
     public RoomEditor(Window owner, RoomView initial, UiSession session, Runnable changed) {
         super(owner, initial == null ? "새 비눗방울 띄우기" : "비눗방울 수정", ModalityType.APPLICATION_MODAL);
-        setUndecorated(true);
-        getRootPane().setWindowDecorationStyle(JRootPane.NONE);
-        setResizable(false);
-        JPanel card = new JPanel(new BorderLayout(0, 18));
-        card.setBackground(Color.WHITE);
-        card.setBorder(BorderFactory.createEmptyBorder(24, 26, 24, 26));
-        card.add(createHeader(), BorderLayout.NORTH);
+        ModalStyle.prepare(this);
+        JPanel card = ModalStyle.surface(18);
+        card.add(ModalStyle.header(getTitle(), null, this::dispose), BorderLayout.NORTH);
 
         JPanel form = column();
         JTextField name = input("어떤 고민을 나누고 싶나요?");
@@ -57,14 +52,15 @@ public final class RoomEditor extends JDialog {
         OptionGroup<ConversationMode> mode = new OptionGroup<>(modeChoices, initialMode, 69, 8);
         append(form, field("대화 방식", mode), 15);
 
+        boolean editingLive = initial != null && session.live();
         OptionGroup<Integer> minutes = new OptionGroup<>(EXPIRY_MINUTES.stream()
                 .map(value -> new OptionGroup.Choice<>(value, value % 60 == 0 ? value / 60 + "시간" : value + "분"))
-                .toList(), DEFAULT_MINUTES, 34, 5);
+                .toList(), editingLive ? null : DEFAULT_MINUTES, 34, 5);
         OptionGroup<Integer> count = new OptionGroup<>(CAPACITIES.stream()
                 .map(value -> new OptionGroup.Choice<>(value, value + "명"))
                 .toList(), initial == null ? 4 : initial.capacity(), 34, 5);
         JPanel columns = panel(new GridLayout(1, 2, 14, 0));
-        if (initial == null || !session.live()) columns.add(field("만료 시간", minutes));
+        columns.add(field(editingLive ? "만료 시간 · 수정 시점부터" : "만료 시간", minutes));
         columns.add(field("최대 참여 인원 · 방장 포함", count));
         columns.setMaximumSize(new Dimension(Integer.MAX_VALUE, columns.getPreferredSize().height));
         append(form, columns, 15);
@@ -74,18 +70,19 @@ public final class RoomEditor extends JDialog {
                 new OptionGroup.Choice<>(true, "비밀방", "방장의 승인을 받은 사람만 참여할 수 있어요.", icon("lock"))),
                 initial != null && initial.privateRoom(), 55, 8);
         append(form, field("공개 여부", privacy), 0);
-        JScrollPane body = scroll(form);
-        body.getViewport().setBackground(Color.WHITE);
-        card.add(body, BorderLayout.CENTER);
+        card.add(ModalStyle.scrollContent(form), BorderLayout.CENTER);
 
         JPanel actions = panel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        actions.add(actionButton("취소", false, this::dispose));
+        actions.add(ModalStyle.action("취소", false, this::dispose));
         var initialRoom = initial == null ? null : session.find(initial);
-        JButton save = actionButton(initial == null ? "비눗방울 띄우기" : "수정 완료", true,
+        JButton save = ModalStyle.action(initial == null ? "비눗방울 띄우기" : "수정 완료", true,
                 () -> UiErrors.perform(this, () -> {
                     String value = name.getText().strip();
                     if (value.isEmpty() || value.length() > MAX_TITLE_LENGTH) {
                         throw new IllegalArgumentException("제목은 1~" + MAX_TITLE_LENGTH + "자로 입력해주세요.");
+                    }
+                    if (minutes.value() == null) {
+                        throw new IllegalArgumentException("수정 시점부터 적용할 만료 시간을 선택해 주세요.");
                     }
                     var old = initialRoom;
                     if (initial != null && session.live() && (old == null || old.removed)) {
@@ -115,17 +112,6 @@ public final class RoomEditor extends JDialog {
         ModalStyle.install(this);
     }
 
-    private JPanel createHeader() {
-        JPanel header = panel(new BorderLayout());
-        JPanel copy = column();
-        JLabel kicker = label("BUBBLE EDITOR", 9, color("8a70d7"));
-        kicker.setFont(UiFonts.logo(9));
-        append(copy, kicker, 6);
-        append(copy, label(getTitle(), 18, INK), 0);
-        header.add(copy);
-        return header;
-    }
-
     private static JPanel field(String caption, JComponent input) {
         JPanel field = column();
         JLabel name = label(caption, 10, color("575164"));
@@ -147,22 +133,11 @@ public final class RoomEditor extends JDialog {
         component.setMinimumSize(new Dimension(0, 40));
     }
 
-    private static JButton actionButton(String text, boolean primary, Runnable action) {
-        JButton button = button(text, primary, action);
-        button.setFont(font(10, true));
-        button.setPreferredSize(new Dimension(100, 40));
-        button.putClientProperty("gradient", primary);
-        return button;
-    }
-
     private void fitToScreen() {
         GraphicsConfiguration configuration = getGraphicsConfiguration();
         Rectangle bounds = configuration.getBounds();
         Insets insets = Toolkit.getDefaultToolkit().getScreenInsets(configuration);
         setSize(Math.min(DIALOG_WIDTH, bounds.width - insets.left - insets.right - 40),
                 Math.min(DIALOG_HEIGHT, bounds.height - insets.top - insets.bottom - 40));
-        if (configuration.getDevice().isWindowTranslucencySupported(GraphicsDevice.WindowTranslucency.PERPIXEL_TRANSPARENT)) {
-            setShape(new java.awt.geom.RoundRectangle2D.Double(0, 0, getWidth(), getHeight(), 40, 40));
-        }
     }
 }
