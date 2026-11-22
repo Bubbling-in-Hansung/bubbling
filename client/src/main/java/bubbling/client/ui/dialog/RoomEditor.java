@@ -16,11 +16,6 @@ public final class RoomEditor extends JDialog {
     private static final List<Integer> EXPIRY_MINUTES = List.of(10, 20, 30, 60);
     private static final List<Integer> CAPACITIES = List.of(2, 3, 4);
 
-    public RoomEditor(Window owner, RoomView initial) {
-        this(owner, initial, new UiSession(false, List.of()), () -> {
-        });
-    }
-
     public RoomEditor(Window owner, RoomView initial, UiSession session, Runnable changed) {
         super(owner, initial == null ? "새 비눗방울 띄우기" : "비눗방울 수정", ModalityType.APPLICATION_MODAL);
         ModalStyle.prepare(this);
@@ -52,15 +47,15 @@ public final class RoomEditor extends JDialog {
         OptionGroup<ConversationMode> mode = new OptionGroup<>(modeChoices, initialMode, 69, 8);
         append(form, field("대화 방식", mode), 15);
 
-        boolean editingLive = initial != null && session.live();
+        boolean editing = initial != null;
         OptionGroup<Integer> minutes = new OptionGroup<>(EXPIRY_MINUTES.stream()
                 .map(value -> new OptionGroup.Choice<>(value, value % 60 == 0 ? value / 60 + "시간" : value + "분"))
-                .toList(), editingLive ? null : DEFAULT_MINUTES, 34, 5);
+                .toList(), editing ? null : DEFAULT_MINUTES, 34, 5);
         OptionGroup<Integer> count = new OptionGroup<>(CAPACITIES.stream()
                 .map(value -> new OptionGroup.Choice<>(value, value + "명"))
                 .toList(), initial == null ? 4 : initial.capacity(), 34, 5);
         JPanel columns = panel(new GridLayout(1, 2, 14, 0));
-        columns.add(field(editingLive ? "만료 시간 · 수정 시점부터" : "만료 시간", minutes));
+        columns.add(field(editing ? "만료 시간 · 수정 시점부터" : "만료 시간", minutes));
         columns.add(field("최대 참여 인원 · 방장 포함", count));
         columns.setMaximumSize(new Dimension(Integer.MAX_VALUE, columns.getPreferredSize().height));
         append(form, columns, 15);
@@ -85,7 +80,7 @@ public final class RoomEditor extends JDialog {
                         throw new IllegalArgumentException("수정 시점부터 적용할 만료 시간을 선택해 주세요.");
                     }
                     var old = initialRoom;
-                    if (initial != null && session.live() && (old == null || old.removed)) {
+                    if (editing && (old == null || old.removed)) {
                         throw new IllegalStateException("수정할 비눗방울이 더 이상 표시되지 않아요.");
                     }
                     int people = old == null ? 1 : old.people;
@@ -104,7 +99,6 @@ public final class RoomEditor extends JDialog {
                     changed.run();
                     dispose();
                 }));
-        save.setEnabled(session.interactive());
         actions.add(save);
         card.add(actions, BorderLayout.SOUTH);
         setContentPane(card);

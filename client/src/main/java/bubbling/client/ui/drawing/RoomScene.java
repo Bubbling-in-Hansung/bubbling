@@ -19,17 +19,12 @@ public final class RoomScene extends JComponent {
     private static final int CHARACTER_HEIGHT = (int) Math.ceil(95 * CHARACTER_SCALE);
     private static final int NAME_WIDTH = 96;
     private static final int FIGURE_HEIGHT = CHARACTER_HEIGHT + 25;
-    private final boolean preview;
     private List<ChatParticipantDto> participants = List.of();
     private String myMemberId;
     private Point2D.Double ownPosition;
     private java.util.function.IntSupplier character = () -> 0;
     public void setCharacter(java.util.function.IntSupplier value) {
         character = value;
-    }
-
-    public RoomScene(boolean preview) {
-        this.preview = preview;
     }
 
     public void showParticipants(List<ChatParticipantDto> participants, String myMemberId) {
@@ -51,7 +46,7 @@ public final class RoomScene extends JComponent {
 
     public Point participantHead(int participant) {
         int w = getWidth(), h = getHeight(), floor = (int) (h * .36), roomHeight = h - floor;
-        boolean own = preview ? participant == 0 : participant < participants.size()
+        boolean own = participant < participants.size()
                 && participants.get(participant).chatMemberId().equals(myMemberId);
         if (own && ownPosition != null) {
             int margin = Math.min(w / 2, Math.max(CHARACTER_WIDTH, NAME_WIDTH) / 2);
@@ -85,12 +80,7 @@ public final class RoomScene extends JComponent {
             g.setColor(color("e6f4f7"));
             g.fillRect(0, 0, w, h);
         }
-        if (preview) {
-            Point self = participantHead(0), other = participantHead(1), guest = participantHead(2);
-            person(g, self.x, self.y, character.getAsInt(), "익명의 고래 · 나");
-            person(g, other.x, other.y, 1, "달빛 구름");
-            person(g, guest.x, guest.y, 3, "작은 여우");
-        } else if (participants.isEmpty()) {
+        if (participants.isEmpty()) {
             centered(g, "대화에 참여하면 캐릭터가 표시돼요", w / 2, h - 25, 11, color("5e5871"));
         } else {
             for (int i = 0; i < Math.min(4, participants.size()); i++) {

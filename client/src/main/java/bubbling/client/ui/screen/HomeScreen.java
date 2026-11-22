@@ -7,7 +7,6 @@ import bubbling.common.enums.ChatRequestStatus;
 import javax.swing.*;
 import java.awt.*;
 import java.util.function.Consumer;
-import java.util.function.BiConsumer;
 import static bubbling.client.ui.style.Styles.*;
 
 public final class HomeScreen extends JPanel {
@@ -15,7 +14,6 @@ public final class HomeScreen extends JPanel {
     private final java.util.Map<String, JButton> bubbleButtons = new java.util.LinkedHashMap<>();
     private final UiSession session;
     private final Consumer<RoomView> enter;
-    private final BiConsumer<String, UiSession.Room> requestApproved;
     private final Runnable requestsOpened;
     private final JPanel detail = panel(new BorderLayout()), field = new JPanel(null);
     private final RoomDetailPanel detailContent = new RoomDetailPanel(this::closeDetail);
@@ -29,17 +27,15 @@ public final class HomeScreen extends JPanel {
             boolean hidden, long retrySeconds, String requestId, ChatRequestStatus requestStatus) {
     }
     private final javax.swing.Timer motion = new javax.swing.Timer(30, e -> BubbleMotion.advance(field, MOTION_SPEED_MULTIPLIER));
-    public HomeScreen(UiData data, Consumer<RoomView> enter, BiConsumer<String, UiSession.Room> requestApproved,
-            Runnable requestsOpened) {
+    public HomeScreen(UiData data, Consumer<RoomView> enter, Runnable requestsOpened) {
         super(new BorderLayout());
         session = data.session();
         this.enter = enter;
-        this.requestApproved = requestApproved;
         this.requestsOpened = requestsOpened;
         setBackground(BG);
         BubbleStage center = new BubbleStage(field, this::openRequestManager,
                 () -> new RoomEditor(SwingUtilities.getWindowAncestor(this), null,
-                session, this::refresh).setVisible(true), session.interactive());
+                session, this::refresh).setVisible(true));
         add(center);
         detail.setPreferredSize(new Dimension(340, 0));
         detail.setOpaque(true);
@@ -78,7 +74,6 @@ public final class HomeScreen extends JPanel {
 
     public void onEnter() {
         detailState = null;
-        session.tick();
         var recent = session.recent();
         if (recent != null) {
             selected = recent;
@@ -95,7 +90,6 @@ public final class HomeScreen extends JPanel {
     }
 
     public void refresh() {
-        session.tick();
         var rooms = session.rooms();
         String key = category + rooms.stream().map(r -> r.id + ":" + r.people + ":" + session.hidden(r) + ":" + r.view).toList();
         if (!key.equals(signature)) {
@@ -177,35 +171,18 @@ public final class HomeScreen extends JPanel {
         JButton join = button(text, true, () -> UiErrors.perform(this, () -> {
             if (!r.joined && !r.ended && r.view.privateRoom() && !r.view.owner()) {
                 session.request(r);
-            } else if (session.live()) {
-                enter.accept(r.view);
             } else {
-                session.enter(r);
                 enter.accept(r.view);
             }
             refresh();
         }));
-        boolean entryEnabled = session.interactive() && (r.joined || r.ended || !session.hidden(r) && remaining == 0
-                && (request == null || request.status != ChatRequestStatus.PENDING));
+        boolean entryEnabled = r.joined || r.ended || !session.hidden(r) && remaining == 0
+                && (request == null || request.status != ChatRequestStatus.PENDING);
         join.setEnabled(entryEnabled);
         join.putClientProperty("gradient", true);
         RoomDetailPanel.addAction(p, join, true, 14);
         if (request != null && request.status == ChatRequestStatus.REJECTED) {
             append(p, label("참여 요청이 거절되었어요.", 11, MUTED), 12);
-        }
-        if (session.preview() && request != null && request.status == ChatRequestStatus.PENDING) {
-            append(p, label("미리보기 · 요청 결과 시연", 9, MUTED), 8);
-            RoomDetailPanel.addAction(p, button("승인 결과 받기", false, () -> {
-                session.decide(request, true);
-                refresh();
-                if (request.status == ChatRequestStatus.ACCEPTED) {
-                    requestApproved.accept(request.id, r);
-                }
-            }), false, 8);
-            RoomDetailPanel.addAction(p, button("거절 결과 받기", false, () -> {
-                session.decide(request, false);
-                refresh();
-            }), false, 12);
         }
         if (r.view.owner()) {
             if (r.view.privateRoom()) {
@@ -214,14 +191,14 @@ public final class HomeScreen extends JPanel {
             }
             JButton edit = button("비눗방울 수정", false, () -> new RoomEditor(SwingUtilities.getWindowAncestor(this), r.view,
                     session, this::refresh).setVisible(true));
-            edit.setEnabled(session.interactive() && !r.removed);
+            edit.setEnabled(!r.removed);
             JButton remove = button("비눗방울 삭제", false, () -> {
                 if (ActionDialog.confirm(this, "비눗방울을 삭제할까요?", "삭제")) {
                     session.remove(r);
                     refresh();
                 }
             });
-            remove.setEnabled(session.interactive() && !r.removed);
+            remove.setEnabled(!r.removed);
             JPanel ownerActions = panel(new GridLayout(1, 2, 7, 0));
             edit.setText("수정");
             edit.setIcon(penIcon());

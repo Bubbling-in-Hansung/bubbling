@@ -1,7 +1,9 @@
 package bubbling.client.ui;
+import bubbling.client.LiveSession;
 import bubbling.client.ui.model.*;
-import bubbling.client.ui.preview.*;
-import com.formdev.flatlaf.FlatLightLaf;
+import bubbling.common.dto.user.UserDto;
+import bubbling.common.enums.BubbleCategory;
+import bubbling.common.enums.ProfileCharacter;
 import org.junit.jupiter.api.Test;
 import javax.swing.*;
 import java.awt.*;
@@ -14,25 +16,34 @@ class ApplicationViewTest {
   return result;
  }
  private static void click(Container root,String text){buttons(root).stream().filter(b->text.equals(b.getText())).findFirst().orElseThrow().doClick();}
- @Test void previewNavigationAndFiltersAreLocal() throws Exception {
+ @Test void homeFiltersServerBubblesAfterSignIn() throws Exception {
   SwingUtilities.invokeAndWait(()->{
-   FlatLightLaf.setup();ApplicationView view=new ApplicationView(PreviewData.create());
+   var live = new LiveSession(message -> {});
+   var data = new UiData(live::send);
+   var view = new ApplicationView(data, live);
+   data.session().applyBubble(ServerRoomFixtures.bubble("career", "진로 고민", BubbleCategory.CAREER, "2099-01-01T00:00:00"));
+   data.session().applyBubble(ServerRoomFixtures.bubble("daily", "일상 고민", BubbleCategory.DAILY, "2099-01-01T00:00:00"));
+   view.signedIn(new UserDto("user", "tester123", "테스터", ProfileCharacter.BUNNY, "2026-11-17T00:00:00"));
    click(view,"진로");
-   var previewRooms=PreviewData.create().session().rooms();
-   var roomButtons=buttons(view).stream().filter(b->previewRooms.stream().anyMatch(r->r.view.title().equals(b.getText()))).toList();
-   assertEquals(2,roomButtons.size());
+   assertTrue(buttons(view).stream().anyMatch(b -> "진로 고민".equals(b.getText())));
+   assertTrue(buttons(view).stream().noneMatch(b -> "일상 고민".equals(b.getText())));
    click(view,"전체");
-   click(view,"요즘 진로 때문에 고민이에요");click(view,"대화 참여하기");assertEquals("chat",view.currentPage());
-   for(String p:new String[]{"home","mypage","login","signup","conversations"}){view.showPage(p);assertEquals(p,view.currentPage());}
+   assertTrue(buttons(view).stream().anyMatch(b -> "일상 고민".equals(b.getText())));
    assertThrows(IllegalArgumentException.class,()->view.showPage("missing"));
-   for(JButton b:buttons(view))if(java.util.List.of("가입 완료").contains(b.getText()))assertFalse(b.isEnabled());
   });
  }
- @Test void ordinaryLaunchDoesNotUsePreviewRooms() throws Exception {
+ @Test void startsWithEmptyStateAndWaitsForServerConnection() throws Exception {
   SwingUtilities.invokeAndWait(()->{
-   ApplicationView view=new ApplicationView(UiData.empty());
-   var previewRooms=PreviewData.create().session().rooms();
-   assertTrue(buttons(view).stream().noneMatch(b->previewRooms.stream().anyMatch(r->r.view.title().equals(b.getText())))); for(JButton b:buttons(view))if(java.util.List.of("전송","퇴장","대화 종료").contains(b.getText()))assertFalse(b.isEnabled());
+   var live = new LiveSession(message -> {});
+   var data = new UiData(live::send);
+   var view = new ApplicationView(data, live);
+   assertEquals(UiPages.LOGIN, view.currentPage());
+   assertTrue(data.session().rooms().isEmpty());
+   assertTrue(data.session().requests().isEmpty());
+   JButton login = buttons(view).stream().filter(b -> "로그인".equals(b.getText())).findFirst().orElseThrow();
+   assertFalse(login.isEnabled());
+   live.connected();
+   assertTrue(login.isEnabled());
   });
  }
 }

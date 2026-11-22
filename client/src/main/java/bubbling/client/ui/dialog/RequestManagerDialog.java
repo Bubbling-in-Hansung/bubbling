@@ -107,7 +107,7 @@ public final class RequestManagerDialog extends JDialog {
         JButton accept = ModalStyle.action("승인", true, () -> decide(request, true));
         reject.setPreferredSize(new Dimension(62, 34));
         accept.setPreferredSize(new Dimension(62, 34));
-        boolean pending = session.interactive() && request.status == ChatRequestStatus.PENDING;
+        boolean pending = request.status == ChatRequestStatus.PENDING;
         reject.setEnabled(pending);
         accept.setEnabled(pending && canAccept(request));
         actions.add(reject);

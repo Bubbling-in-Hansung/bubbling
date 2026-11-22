@@ -50,7 +50,7 @@ public final class ProfileScreen extends JPanel {
         hero.add(art, BorderLayout.WEST);
         JPanel copy = column();
         append(copy, label("MY LITTLE SPACE", 9, PURPLE), 9);
-        spaceTitle = title(data.preview() ? "버블버블님의 공간" : "나의 공간", 20);
+        spaceTitle = title("나의 공간", 20);
         append(copy, spaceTitle, 9);
         append(copy, label("나만의 캐릭터와 함께 마음을 나눠요", 9, MUTED), 16);
         append(copy, button("캐릭터 변경", false, () -> characters()), 0);
@@ -58,9 +58,7 @@ public final class ProfileScreen extends JPanel {
         JPanel account = column();
         account.setPreferredSize(new Dimension(230, 140));
         account.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, LINE));
-        accountId.setText("   계정 아이디     " + (data.preview() ? "bubble_user" : "—"));
-        accountNickname.setText("   계정 닉네임     " + (data.preview() ? "버블버블" : "—"));
-        createdAt.setText("   가입일              —");
+        setAccount(null);
         append(account, accountId, 22);
         append(account, accountNickname, 22);
         append(account, createdAt, 22);
@@ -87,14 +85,7 @@ public final class ProfileScreen extends JPanel {
 
     private void characters() {
         Window owner = SwingUtilities.getWindowAncestor(this);
-        new CharacterPickerDialog(owner, session.character(),
-                session.preview() || signedIn && saveProfile != null, value -> {
-            if (session.preview()) {
-                session.character(value);
-                if (owner != null) owner.repaint();
-            } else {
-                saveProfile.accept(CharacterChoice.at(value).profile());
-            }
-        }).setVisible(true);
+        new CharacterPickerDialog(owner, session.character(), signedIn,
+                value -> saveProfile.accept(CharacterChoice.at(value).profile())).setVisible(true);
     }
 }

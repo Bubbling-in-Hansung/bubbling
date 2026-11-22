@@ -10,7 +10,7 @@ public final class BubbleStage extends JPanel {
     private final JPanel heading = column();
     private final JButton requests, create;
     private final JLabel legend = label("•  비눗방울 위에 마우스를 올리면 잠시 멈춰요", 10, color("aaa6b4"));
-    public BubbleStage(JPanel field, Runnable manage, Runnable write, boolean editable) {
+    public BubbleStage(JPanel field, Runnable manage, Runnable write) {
         super(null);
         this.field = field;
         field.setOpaque(false);
@@ -28,7 +28,6 @@ public final class BubbleStage extends JPanel {
         create.setIcon(penIcon());
         create.setIconTextGap(9);
         create.setMargin(new Insets(0, 20, 0, 20));
-        create.setEnabled(editable);
         add(heading);
         add(requests);
         add(create);

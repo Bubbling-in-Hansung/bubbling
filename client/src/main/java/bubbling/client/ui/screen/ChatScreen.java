@@ -27,7 +27,6 @@ public final class ChatScreen extends JPanel {
     private final JButton send, end, leave, edit;
     private JButton historyToggle;
     private JScrollPane log;
-    private final boolean preview;
     private final javax.swing.Timer timer;
     private final javax.swing.Timer activityTimer;
     private RoomScene scene;
@@ -43,7 +42,6 @@ public final class ChatScreen extends JPanel {
     private static final DateTimeFormatter MESSAGE_TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault());
     public ChatScreen(UiData data, Runnable back) {
         super(new BorderLayout());
-        preview = data.preview();
         session = data.session();
         JPanel header = panel(new BorderLayout(16, 0));
         header.setOpaque(true);
@@ -87,7 +85,7 @@ public final class ChatScreen extends JPanel {
         add(header, BorderLayout.NORTH);
         JPanel body = panel(new BorderLayout());
         JPanel world = panel(new BorderLayout());
-        scene = new RoomScene(preview);
+        scene = new RoomScene();
         scene.setCharacter(session::character);
         scene.setLayout(null);
         speech.setLayout(null);
@@ -140,14 +138,9 @@ public final class ChatScreen extends JPanel {
         actionRow.add(historyToggle);
         end = button("대화 종료", false, () -> {
             UiSession.Room target = current;
-            if (target != null && ActionDialog.confirm(this,
-                    preview ? "대화방을 종료하고 목록에서 삭제할까요?" : "대화를 종료할까요?", "종료")
+            if (target != null && ActionDialog.confirm(this, "대화를 종료할까요?", "종료")
                     && target == current && target.joined && !target.ended) {
                 session.end(target);
-                if (preview) {
-                    session.remove(target);
-                    back.run();
-                }
             }
         });
         leave = button("퇴장", false, () -> {
@@ -155,22 +148,10 @@ public final class ChatScreen extends JPanel {
             if (target != null && ActionDialog.confirm(this, "대화방에서 나갈까요?", "퇴장")
                     && target == current && target.joined && !target.ended) {
                 session.leave(target);
-                if (preview) {
-                    refresh();
-                    back.run();
-                }
             }
         });
         actionRow.add(end);
         actionRow.add(leave);
-        if (preview) {
-            actionRow.add(button("상대 메시지 시연", false, () -> {
-                if (current != null && current.joined && !current.ended) {
-                    session.send(current, "천천히 이야기해 주세요. 함께 듣고 있어요.", false);
-                    refresh();
-                }
-            }));
-        }
         removeButtonOutline(backButton);
         for (Component component : actionRow.getComponents()) {
             if (component instanceof JButton action) {
@@ -267,13 +248,8 @@ public final class ChatScreen extends JPanel {
         if (current != next) scene.resetOwnPosition();
         room = selected;
         current = next;
-        if (session.live()) {
-            input.setText("");
-            refreshLive();
-            return;
-        }
-        updateRoomHeading();
-        refresh();
+        input.setText("");
+        refreshLive();
     }
 
     public void refreshLive() {
@@ -303,7 +279,7 @@ public final class ChatScreen extends JPanel {
     }
 
     private boolean canEditBubble() {
-        return session.interactive() && current != null && current.view.owner() && !current.ended && !current.removed
+        return current != null && current.view.owner() && !current.ended && !current.removed
                 && (current.expiresAt == null || current.expiresAt.isAfter(session.now()));
     }
 
@@ -321,7 +297,7 @@ public final class ChatScreen extends JPanel {
     }
 
     private void send() {
-        if (!session.interactive() || current == null || current.ended || !current.joined || input.getText().isBlank()) {
+        if (current == null || current.ended || !current.joined || input.getText().isBlank()) {
             return;
         }
         if (!MessageText.acceptsInput(input.getText()) || MessageText.lines(input.getText(), input.getFontMetrics(font(11,
@@ -331,13 +307,13 @@ public final class ChatScreen extends JPanel {
                     + "줄까지 입력할 수 있어요.");
             return;
         }
-        session.send(current, input.getText(), true);
+        session.send(current, input.getText());
         input.setText("");
         refresh();
     }
 
     private void refresh() {
-        boolean enabled = session.interactive() && current != null && !current.ended && current.joined;
+        boolean enabled = current != null && !current.ended && current.joined;
         boolean owner = room != null && room.owner();
         send.setEnabled(enabled);
         input.setEnabled(enabled);
@@ -420,11 +396,9 @@ public final class ChatScreen extends JPanel {
 
     private void renderSpeech() {
         List<List<UiSession.Message>> messages = List.of();
-        if (current != null && session.live() && current.conversation != null && !current.ended) {
+        if (current != null && current.conversation != null && !current.ended) {
             messages = current.participants().stream().limit(4)
                     .map(ChatParticipantDto::chatMemberId).map(id -> session.speech(current, id)).toList();
-        } else if (current != null && preview) {
-            messages = List.of(session.speech(current, "익명의 고래"), session.speech(current, "달빛 구름"));
         }
         if (speechRoom == current && messages.equals(visibleSpeech)) {
             return;

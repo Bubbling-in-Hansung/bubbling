@@ -15,7 +15,7 @@ import java.time.*;
 import java.util.*;
 import java.util.function.BiConsumer;
 
-/** Presentation state used by the memory preview and live screens. */
+/** Presentation state populated by server responses and events. */
 public final class UiSession {
     private static final Duration RETRY_DELAY = Duration.ofSeconds(60);
     public static final class Room {
@@ -29,19 +29,16 @@ public final class UiSession {
         public boolean visited;
         public boolean listed;
         public Instant expiresAt;
-        private int previewExpirationMinutes = 30;
         public ChatRoomDto conversation;
         private String myMemberId;
         public int historyRevision;
         public final List<Message> messages = new ArrayList<>();
         private final Map<String, ChatMessageDto> received = new LinkedHashMap<>();
-        Room(String id, RoomView view, Instant now) {
+        Room(String id, RoomView view) {
             this.id = id;
             this.bubbleId = id;
             this.view = view;
             people = view.people();
-            joined = view.owner();
-            expiresAt = view.expired() ? now : now.plusSeconds(previewExpirationMinutes * 60L);
         }
 
         public List<ChatParticipantDto> participants() {
@@ -49,11 +46,7 @@ public final class UiSession {
         }
     }
 
-    public record Message(String sender, String text, boolean mine, Instant at, String memberId) {
-        public Message(String sender, String text, boolean mine, Instant at) {
-            this(sender, text, mine, at, null);
-        }
-    }
+    public record Message(String sender, String text, boolean mine, Instant at, String memberId) {}
 
     public static final class Request {
         public final String id;
@@ -69,7 +62,6 @@ public final class UiSession {
         }
     }
 
-    private final boolean preview;
     private final SessionRequests liveRequests;
     private final Clock clock;
     private final LinkedHashMap<String, Room> rooms = new LinkedHashMap<>();
@@ -79,39 +71,9 @@ public final class UiSession {
     private final Set<String> ownedBubbles = new HashSet<>();
     private String recent;
     private int character;
-    public UiSession(boolean preview, List<RoomView> views) {
-        this(preview, views, Clock.systemUTC());
-    }
-
-    public UiSession(boolean preview, List<RoomView> views, Clock clock) {
-        this(preview, views, clock, null);
-    }
-
-    UiSession(boolean preview, List<RoomView> views, Clock clock, BiConsumer<MessageType, Object> transport) {
-        this.preview = preview;
+    public UiSession(Clock clock, BiConsumer<MessageType, Object> transport) {
         this.clock = clock;
-        liveRequests = transport == null ? null : new SessionRequests(transport);
-        int i = 0;
-        for (var v : views) {
-            var room = new Room("preview-" + i++, v, clock.instant());
-            rooms.put(room.id, room);
-            if (preview && v.owner()) {
-                requests.add(new Request(UUID.randomUUID().toString(), room.id, "달빛 구름", true));
-                requests.add(new Request(UUID.randomUUID().toString(), room.id, "작은 여우", true));
-            }
-        }
-    }
-
-    public boolean preview() {
-        return preview;
-    }
-
-    public boolean live() {
-        return liveRequests != null;
-    }
-
-    public boolean interactive() {
-        return preview || live();
+        liveRequests = new SessionRequests(Objects.requireNonNull(transport));
     }
 
     public void applyInitialState(InitialStateDto snapshot) {
@@ -131,7 +93,7 @@ public final class UiSession {
                 bubble.maxMemberCnt(), !bubble.isOpen(), bubble.status() == BubbleStatus.EXPIRED,
                 ownedBubbles.contains(bubbleId), Math.floorMod(hash, CharacterChoice.count()),
                 .15 + Math.floorMod(hash, 100) / 150.0, .15 + Math.floorMod(hash >>> 8, 100) / 150.0, 152);
-        var room = rooms.computeIfAbsent(bubbleId, id -> new Room(id, view, now()));
+        var room = rooms.computeIfAbsent(bubbleId, id -> new Room(id, view));
         if (!room.view.equals(view)) room.view = view;
         room.expiresAt = timestamp(bubble.expiresAt());
         room.people = bubble.currentMemberCnt();
@@ -283,7 +245,6 @@ public final class UiSession {
     }
 
     public List<Room> rooms() {
-        tick();
         return List.copyOf(rooms.values());
     }
 
@@ -300,7 +261,6 @@ public final class UiSession {
     }
 
     public List<Request> requests() {
-        tick();
         return List.copyOf(requests);
     }
 
@@ -314,7 +274,6 @@ public final class UiSession {
     }
 
     public void request(Room r) {
-        tick();
         if (hidden(r) || retrySeconds(r) > 0) {
             throw new IllegalStateException("지금은 참여 요청을 보낼 수 없어요.");
         }
@@ -322,56 +281,24 @@ public final class UiSession {
         if (old != null && old.status == ChatRequestStatus.PENDING) {
             return;
         }
-        if (live()) {
-            liveRequests.requestChat(r.bubbleId);
-            return;
-        }
-        writable();
-        requests.add(new Request(UUID.randomUUID().toString(), r.id, "나", false));
+        liveRequests.requestChat(r.bubbleId);
     }
 
     public void decide(Request q, boolean accept) {
-        tick();
         if (q.status != ChatRequestStatus.PENDING) {
             return;
         }
         Room r = room(q.roomId);
-        if (live()) {
-            if (accept && (r == null || hidden(r))) {
-                throw new IllegalStateException("지금은 이 방의 요청을 승인할 수 없어요.");
-            }
-            liveRequests.decideChat(q.id, accept);
-            return;
+        if (accept && (r == null || hidden(r))) {
+            throw new IllegalStateException("지금은 이 방의 요청을 승인할 수 없어요.");
         }
-        writable();
-        if (accept && !hidden(r)) {
-            q.status = ChatRequestStatus.ACCEPTED;
-            r.people++;
-            if (!q.incoming) {
-                r.joined = true;
-                r.visited = true;
-            }
-        } else {
-            reject(q);
-        }
-        tick();
+        liveRequests.decideChat(q.id, accept);
     }
 
     private void reject(Request q) {
         q.status = ChatRequestStatus.REJECTED;
         if (!q.incoming && rejected.add(q.id)) {
             retry.put(q.roomId, now().plus(RETRY_DELAY));
-        }
-    }
-
-    public void tick() {
-        if (!preview) {
-            return;
-        }
-        for (var q : requests) {
-            if (q.status == ChatRequestStatus.PENDING && hidden(room(q.roomId))) {
-                reject(q);
-            }
         }
     }
 
@@ -382,22 +309,6 @@ public final class UiSession {
     public void openLiveRoom(Room room) {
         if (!canOpen(room)) return;
         liveRequests.joinChat(room.bubbleId);
-    }
-
-    public void enter(Room r) {
-        writable();
-        if (!r.ended && !r.joined) {
-            if (!canOpen(r)) {
-                throw new IllegalStateException("참여 승인이 필요하거나 입장할 수 없는 방이에요.");
-            }
-            r.joined = true;
-            r.people++;
-        }
-        r.visited = true;
-        if (r.view.owner()) {
-            recent = r.id;
-        }
-        tick();
     }
 
     public void visit(Room r) {
@@ -412,53 +323,19 @@ public final class UiSession {
     }
 
     public void leave(Room r) {
-        if (live()) {
-            liveRequests.leaveChat(r.bubbleId);
-            return;
-        }
-        writable();
-        if (r.joined) {
-            r.joined = false;
-            r.people = Math.max(0, r.people - 1);
-        }
+        liveRequests.leaveChat(r.bubbleId);
     }
 
     public void end(Room r) {
-        if (live()) {
-            liveRequests.endChat(r.conversation.chatRoomId());
-            return;
-        }
-        writable();
-        if (!r.view.owner()) {
-            throw new IllegalStateException("방장만 종료할 수 있어요.");
-        }
-        r.ended = true;
-        r.joined = false;
-        r.people = 0;
-        tick();
+        liveRequests.endChat(r.conversation.chatRoomId());
     }
 
-    public void send(Room r, String text, boolean mine) {
-        if (live()) {
-            liveRequests.sendMessage(r.conversation.chatRoomId(), text);
-            return;
-        }
-        writable();
-        if (r.ended || !r.joined) {
-            throw new IllegalStateException("대화에 참여한 상태에서만 전송할 수 있어요.");
-        }
-        if (text == null || text.isBlank()) {
-            return;
-        }
-        Instant sentAt = now();
-        r.messages.add(new Message(mine ? "익명의 고래" : "달빛 구름", text.strip(), mine, sentAt));
-        if (!r.removed && r.expiresAt != null && r.expiresAt.isAfter(sentAt)) {
-            r.expiresAt = sentAt.plusSeconds(r.previewExpirationMinutes * 60L);
-        }
+    public void send(Room r, String text) {
+        liveRequests.sendMessage(r.conversation.chatRoomId(), text);
     }
 
-    public List<Message> speech(Room r, String sender) {
-        var values = r.messages.stream().filter(m -> Objects.equals(live() ? m.memberId() : m.sender(), sender)
+    public List<Message> speech(Room r, String memberId) {
+        var values = r.messages.stream().filter(m -> Objects.equals(m.memberId(), memberId)
                 && m.at() != null && m.at().plusSeconds(7).isAfter(now())).toList();
         return values.subList(Math.max(0, values.size() - 3), values.size());
     }
@@ -471,57 +348,15 @@ public final class UiSession {
         character = CharacterChoice.indexOf(profile);
     }
 
-    public void character(int value) {
-        writable();
-        character = Math.floorMod(value, CharacterChoice.count());
-    }
-
-    public Room create(RoomView view, int minutes) {
-        if (live()) {
-            liveRequests.createBubble(view, minutes);
-            return null;
-        }
-        writable();
-        Room r = new Room(UUID.randomUUID().toString(), view, now());
-        r.previewExpirationMinutes = minutes;
-        r.expiresAt = now().plusSeconds(minutes * 60L);
-        rooms.put(r.id, r);
-        recent = r.id;
-        return r;
+    public void create(RoomView view, int minutes) {
+        liveRequests.createBubble(view, minutes);
     }
 
     public void update(Room r, RoomView view, int minutes) {
-        if (live()) {
-            liveRequests.updateBubble(r.bubbleId, view, minutes);
-            return;
-        }
-        writable();
-        if (!r.view.owner()) {
-            throw new IllegalStateException("내 비눗방울만 수정할 수 있어요.");
-        }
-        r.view = view;
-        r.previewExpirationMinutes = minutes;
-        r.expiresAt = now().plusSeconds(minutes * 60L);
-        tick();
+        liveRequests.updateBubble(r.bubbleId, view, minutes);
     }
 
     public void remove(Room r) {
-        if (live()) {
-            liveRequests.deleteBubble(r.bubbleId);
-            return;
-        }
-        writable();
-        if (!r.view.owner()) {
-            throw new IllegalStateException("내 비눗방울만 삭제할 수 있어요.");
-        }
-        r.removed = true;
-        tick();
+        liveRequests.deleteBubble(r.bubbleId);
     }
-
-    private void writable() {
-        if (!preview) {
-            throw new IllegalStateException("서비스 연결 후 사용할 수 있어요.");
-        }
-    }
-
 }

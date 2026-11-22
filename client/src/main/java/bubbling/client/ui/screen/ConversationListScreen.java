@@ -69,7 +69,7 @@ public final class ConversationListScreen extends JPanel {
     public void refresh() {
         rows.removeAll();
         for (var r : session.rooms()) {
-            if (session.live() ? !r.listed && !r.visited : !r.visited && !r.joined && !r.ended && !r.view.owner()) {
+            if (!r.listed && !r.visited) {
                 continue;
             }
             if (!filter.includes(r)) {
@@ -102,11 +102,9 @@ public final class ConversationListScreen extends JPanel {
         append(copy, roomTitle, 6);
         append(copy, label((r.view.mode() == null ? "" : r.view.mode() + " · ") + r.people + " / " + r.view.capacity() + "명", 10, MUTED), 0);
         row.add(copy);
-        JButton action = button(r.ended ? "기록 보기" : "대화로 이동", false, () -> UiErrors.perform(this, () -> {
-            if (session.preview()) session.enter(r);
-            enter.accept(r.view);
-        }));
-        action.setEnabled(session.interactive() && session.canOpen(r));
+        JButton action = button(r.ended ? "기록 보기" : "대화로 이동", false,
+                () -> UiErrors.perform(this, () -> enter.accept(r.view)));
+        action.setEnabled(session.canOpen(r));
         row.add(action, BorderLayout.EAST);
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 110));
         return row;

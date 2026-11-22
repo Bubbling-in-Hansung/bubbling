@@ -18,7 +18,7 @@ public final class CharacterPickerDialog extends JDialog {
         body.add(ModalStyle.header(getTitle(), editable ? "채팅에서 사용할 캐릭터를 골라주세요."
                 : "캐릭터를 미리 볼 수 있어요. 현재 연결에서는 저장할 수 없어요.", this::dispose), BorderLayout.NORTH);
         JPanel choices = panel(new BorderLayout(20, 0));
-        JComponent preview = new JComponent() {
+        JComponent characterDisplay = new JComponent() {
             @Override
             protected void paintComponent(Graphics source) {
                 var g = graphics(source);
@@ -32,8 +32,8 @@ public final class CharacterPickerDialog extends JDialog {
                 g.dispose();
             }
         };
-        preview.setPreferredSize(new Dimension(190, 265));
-        choices.add(preview, BorderLayout.WEST);
+        characterDisplay.setPreferredSize(new Dimension(190, 265));
+        choices.add(characterDisplay, BorderLayout.WEST);
         JPanel grid = panel(new GridLayout(2, 3, 8, 8));
         ButtonGroup group = new ButtonGroup();
         for (int i = 0; i < CharacterChoice.count(); i++) {
@@ -43,7 +43,7 @@ public final class CharacterPickerDialog extends JDialog {
             choice.setSelected(i == selected);
             choice.addActionListener(e -> {
                 selected = n;
-                preview.repaint();
+                characterDisplay.repaint();
             });
             grid.add(choice);
         }

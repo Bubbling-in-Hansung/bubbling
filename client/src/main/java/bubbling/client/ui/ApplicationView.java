@@ -35,7 +35,6 @@ public final class ApplicationView extends JPanel {
     private final Map<String, Integer> unreadMessagesByRoom = new HashMap<>();
     private int unreadApprovals;
     private int unreadIncomingRequests;
-    private RoomView currentRoom;
     private final UiData data;
     private final LiveSession live;
     private final AuthScreen login;
@@ -45,15 +44,11 @@ public final class ApplicationView extends JPanel {
     private JLabel nickname;
     private JLabel caption;
 
-    public ApplicationView(UiData data) {
-        this(data, null);
-    }
-
     public ApplicationView(UiData data, LiveSession live) {
         super(new BorderLayout());
         this.data = data;
         this.live = live;
-        home = new HomeScreen(data, this::enterRoom, this::requestApproved, this::clearIncomingRequestBadge);
+        home = new HomeScreen(data, this::enterRoom, this::clearIncomingRequestBadge);
         chat = new ChatScreen(data, () -> showPage(HOME));
         JPanel shell = panel(new BorderLayout());
         shell.add(createHeader(), BorderLayout.NORTH);
@@ -62,24 +57,21 @@ public final class ApplicationView extends JPanel {
         conversations = new ConversationListScreen(data, this::enterRoom, this::roomNotificationDescription);
         shellDeck.add(conversations, CONVERSATIONS);
         headerContent.add(title("나의 대화", 14), CONVERSATIONS);
-        profileScreen = new ProfileScreen(data, live == null ? null : live::updateProfile);
+        profileScreen = new ProfileScreen(data, live::updateProfile);
         shellDeck.add(profileScreen, PROFILE);
         shell.add(shellDeck);
         deck.add(shell, "shell");
         deck.add(chat, CHAT);
-        Runnable previewHome = live == null ? () -> showPage(HOME) : null;
-        login = new AuthScreen(false, () -> showPage(SIGNUP), previewHome,
-                live == null ? null : (id, password, name) -> live.authenticate(false, id, password, name));
-        signup = new AuthScreen(true, () -> showPage(LOGIN), previewHome,
-                live == null ? null : (id, password, name) -> live.authenticate(true, id, password, name));
+        login = new AuthScreen(false, () -> showPage(SIGNUP),
+                (id, password, name) -> live.authenticate(false, id, password, name));
+        signup = new AuthScreen(true, () -> showPage(LOGIN),
+                (id, password, name) -> live.authenticate(true, id, password, name));
         deck.add(login, LOGIN);
         deck.add(signup, SIGNUP);
         add(deck);
-        if (live != null) {
-            live.bind(this, data.session());
-            authentication(false, "서버에 연결 중입니다…");
-        }
-        showPage(live == null ? HOME : LOGIN);
+        live.bind(this, data.session());
+        authentication(false, "서버에 연결 중입니다…");
+        showPage(LOGIN);
     }
 
     private JPanel createHeader() {
@@ -137,11 +129,11 @@ public final class ApplicationView extends JPanel {
         dot.setPreferredSize(new Dimension(16, 16));
         user.add(dot);
         JPanel account = column();
-        nickname = label(data.preview() ? "버블버블" : "로그인 후 이용해주세요", 11, INK);
+        nickname = label("로그인 후 이용해주세요", 11, INK);
         nickname.setFont(font(11, true));
         nickname.setAlignmentX(Component.RIGHT_ALIGNMENT);
         account.add(nickname);
-        caption = label(data.preview() ? "미리보기" : "", 8, color("9d98a7"));
+        caption = label("", 8, color("9d98a7"));
         caption.setAlignmentX(Component.RIGHT_ALIGNMENT);
         account.add(Box.createVerticalStrut(2));
         account.add(caption);
@@ -234,7 +226,7 @@ public final class ApplicationView extends JPanel {
         JButton logout = button("", false, this::leaveApplication);
         logout.setIcon(icon("logout"));
         logout.putClientProperty("flat", true);
-        String logoutLabel = live == null ? "로그인 화면" : "로그아웃 및 종료";
+        String logoutLabel = "로그아웃 및 종료";
         logout.setToolTipText(logoutLabel);
         logout.getAccessibleContext().setAccessibleName(logoutLabel);
         append(bottom, logout, 5);
@@ -243,10 +235,6 @@ public final class ApplicationView extends JPanel {
     }
 
     private void leaveApplication() {
-        if (live == null) {
-            showPage(LOGIN);
-            return;
-        }
         Window window = SwingUtilities.getWindowAncestor(this);
         if (window != null) {
             window.dispatchEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING));
@@ -281,7 +269,7 @@ public final class ApplicationView extends JPanel {
         }
         revalidate();
         repaint();
-        if (live != null && page.equals(PROFILE) && changedPage) {
+        if (page.equals(PROFILE) && changedPage) {
             live.requestAccount();
         }
     }
@@ -290,33 +278,19 @@ public final class ApplicationView extends JPanel {
         return currentPage;
     }
 
-    public RoomView currentRoom() {
-        return currentRoom;
-    }
-
     public void enterRoom(RoomView room) {
         if (!SwingUtilities.isEventDispatchThread()) {
             throw new IllegalStateException("Use EDT");
         }
         java.util.Objects.requireNonNull(room);
         var state = data.session().find(room);
-        if (live != null) {
-            if (state == null) return;
-            if (state.conversation != null && (state.joined || state.ended)) {
-                openLiveChat(state);
-                if (state.listed) live.requestHistory(state.conversation.chatRoomId());
-            } else {
-                data.session().openLiveRoom(state);
-            }
-            return;
+        if (state == null) return;
+        if (state.conversation != null && (state.joined || state.ended)) {
+            openLiveChat(state);
+            if (state.listed) live.requestHistory(state.conversation.chatRoomId());
+        } else {
+            data.session().openLiveRoom(state);
         }
-        currentRoom = room;
-        if (state != null) {
-            data.session().visit(state);
-        }
-        chat.showRoom(room);
-        if (state != null) unopenedApprovedRooms.remove(approvalRoomId(state));
-        showPage(CHAT);
     }
 
     public void authentication(boolean enabled, String status) {
@@ -417,9 +391,7 @@ public final class ApplicationView extends JPanel {
     }
 
     public void updateAccount(UserDto user) {
-        if (live != null) {
-            data.session().applyProfile(user == null ? null : user.profile());
-        }
+        data.session().applyProfile(user == null ? null : user.profile());
         nickname.setText(user == null ? "" : user.nickname() + "님");
         profileScreen.setAccount(user);
         repaint();
@@ -430,7 +402,6 @@ public final class ApplicationView extends JPanel {
     }
 
     public void openLiveChat(UiSession.Room room) {
-        currentRoom = room.view;
         data.session().visit(room);
         chat.showRoom(room.view);
         unopenedApprovedRooms.remove(approvalRoomId(room));
@@ -461,7 +432,6 @@ public final class ApplicationView extends JPanel {
         NotificationCards.clear(this);
         showPage(LOGIN);
         data.session().resetLiveState();
-        currentRoom = null;
         home.resetLive();
         chat.resetLive();
         updateAccount(null);

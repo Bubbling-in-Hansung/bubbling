@@ -21,11 +21,7 @@ public final class AuthScreen extends JPanel {
     private final JLabel status = label(" ", 10, PURPLE);
     private final JButton submit;
 
-    public AuthScreen(boolean signup, Runnable switchMode, Runnable home) {
-        this(signup, switchMode, home, null);
-    }
-
-    public AuthScreen(boolean signup, Runnable switchMode, Runnable home, Submit action) {
+    public AuthScreen(boolean signup, Runnable switchMode, Submit action) {
         setLayout(null);
         card.setLayout(new GridBagLayout());
         add(card);
@@ -45,21 +41,18 @@ public final class AuthScreen extends JPanel {
             field(form, "계정 닉네임", nickname);
         }
         submit = pending(signup ? "가입 완료" : "로그인");
-        if (action != null) {
-            submit.addActionListener(event -> submit(action, password, confirmation, nickname));
-            if (signup) {
-                password.addActionListener(event -> confirmation.requestFocusInWindow());
-                confirmation.addActionListener(event -> submit.doClick());
-                nickname.addActionListener(event -> submit.doClick());
-            } else {
-                password.addActionListener(event -> submit.doClick());
-            }
-            append(form, status, 8);
+        submit.addActionListener(event -> submit(action, password, confirmation, nickname));
+        if (signup) {
+            password.addActionListener(event -> confirmation.requestFocusInWindow());
+            confirmation.addActionListener(event -> submit.doClick());
+            nickname.addActionListener(event -> submit.doClick());
+        } else {
+            password.addActionListener(event -> submit.doClick());
         }
+        append(form, status, 8);
         submit.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
         append(form, submit, 16);
         append(form, button(signup ? "이미 계정이 있나요?  로그인" : "아직 계정이 없나요?  회원가입", false, switchMode), 8);
-        if (home != null) append(form, button("화면 미리보기", false, home), 0);
         form.setPreferredSize(new Dimension(330, Math.max(signup ? 440 : 380, form.getPreferredSize().height)));
         card.add(form);
     }
