@@ -4,6 +4,7 @@ import bubbling.client.config.ClientConfig;
 import bubbling.client.network.ClientMessageDispatcher;
 import bubbling.client.network.TcpClient;
 import bubbling.client.ui.frame.MainFrame;
+import bubbling.client.ui.model.UiData;
 import com.formdev.flatlaf.FlatLightLaf;
 
 import javax.swing.*;
@@ -38,11 +39,19 @@ public class ClientBootstrap {
                 config.getPort(),
                 dispatcher
         );
+        LiveSession session = new LiveSession(client::send);
+        session.registerHandlers(dispatcher);
+        dispatcher.onDisconnect(() -> {
+            client.close();
+            SwingUtilities.invokeLater(() -> {
+                if (!closing) session.disconnected("서버 연결이 끊겼습니다. 앱을 다시 실행해 주세요.");
+            });
+        });
 
         // 스윙 UI 출력
         SwingUtilities.invokeLater(() -> {
             // MainFrame Root 형식으로 띄우기
-            MainFrame frame = new MainFrame(config);
+            MainFrame frame = new MainFrame(config, new UiData(session::send), session);
             frame.setDefaultCloseOperation(
                     JFrame.DISPOSE_ON_CLOSE
             );
@@ -53,14 +62,18 @@ public class ClientBootstrap {
                 // 창을 닫으면 volatile 상태 변경(닫힘) 후 클라이언트 TCP 연결 해제 후 자원 반환
                 public void windowClosed(WindowEvent e) {
                     closing = true;
+                    session.close();
                     client.close();
                 }
             });
 
             // 메인 프레임 view 출력
             frame.setVisible(true);
+            connect(client, session);
         });
-        
+    }
+
+    private void connect(TcpClient client, LiveSession session) {
         // 데몬 스레드로 연결 자체만 담당하는 스레드 생성 후 최초 1회만 실행
         Thread connectionThread = new Thread(() -> {
             try {
@@ -68,17 +81,12 @@ public class ClientBootstrap {
                 if (closing) {
                     client.close();
                 }
-            } catch (IOException e) {
-                if (closing) {
-                    return;
-                }
                 SwingUtilities.invokeLater(() -> {
-                    JOptionPane.showMessageDialog(
-                            null,
-                            "서버 연결에 실패했습니다.\n" + e.getMessage(),
-                            "연결 오류",
-                            JOptionPane.ERROR_MESSAGE
-                    );
+                    if (!closing && client.isConnected()) session.connected();
+                });
+            } catch (IOException e) {
+                SwingUtilities.invokeLater(() -> {
+                    if (!closing) session.disconnected("서버에 연결할 수 없습니다. 서버 주소와 실행 상태를 확인해 주세요.");
                 });
             }
 
