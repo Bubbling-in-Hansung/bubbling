@@ -90,6 +90,10 @@ public final class Styles {
                 if (soft && isEnabled() && !getModel().isRollover() && !isSelected()) {
                     fill = getBackground();
                 }
+                if (soft && isEnabled() && getModel().isRollover()
+                        && getClientProperty("softHover") instanceof Color hoverColor) {
+                    fill = hoverColor;
+                }
                 if (category) {
                     fill = getModel().isRollover() || isSelected() || hasFocus() ? color("eee9ff") : new Color(0, 0, 0, 0);
                 }
@@ -313,6 +317,10 @@ public final class Styles {
     }
 
     public static JPanel card(Color color, int radius) {
+        return card(color, radius, true);
+    }
+
+    public static JPanel card(Color color, int radius, boolean outline) {
         return new JPanel() {
             {
                 setOpaque(false);
@@ -322,8 +330,10 @@ public final class Styles {
                 Graphics2D g = graphics(source);
                 g.setColor(color);
                 g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
-                g.setColor(LINE);
-                g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
+                if (outline) {
+                    g.setColor(LINE);
+                    g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, radius, radius);
+                }
                 g.dispose();
             }
         };

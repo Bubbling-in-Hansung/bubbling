@@ -21,6 +21,7 @@ public class Bubble {
     private BubbleStatus status = BubbleStatus.ALIVE;
     private int reactionCnt = 0;
     private final LocalDateTime createdAt = LocalDateTime.now();
+    private int expireMinute;
     private LocalDateTime expiresAt;
 
     private Bubble(User owner, String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen, int expireMinute) {
@@ -30,6 +31,7 @@ public class Bubble {
         this.method = method;
         this.maxMemberCnt = maxMemberCnt;
         this.isOpen = isOpen;
+        this.expireMinute = expireMinute;
         this.expiresAt = LocalDateTime.now().plusMinutes(expireMinute);
     }
 
@@ -43,18 +45,30 @@ public class Bubble {
         return new Bubble(owner, title, category, method, maxMemberCnt, isOpen, expireMinute);
     }
 
-    public synchronized void update(String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen) {
+    public synchronized void update(String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen, int expireMinute) {
         validateAlive();
         title = validateTitle(title);
         validateMaxMemberCnt(maxMemberCnt);
         Objects.requireNonNull(category, "카테고리는 필수입니다.");
         Objects.requireNonNull(method, "대화 방식은 필수입니다.");
+        validateExpireMinute(expireMinute);
 
         this.title = title;
         this.category = category;
         this.method = method;
         this.maxMemberCnt = maxMemberCnt;
         this.isOpen = isOpen;
+        this.expireMinute = expireMinute;
+        this.expiresAt = LocalDateTime.now().plusMinutes(expireMinute);
+    }
+
+    public synchronized boolean refreshExpiration() {
+        LocalDateTime now = LocalDateTime.now();
+        if (status != BubbleStatus.ALIVE || !expiresAt.isAfter(now)) {
+            return false;
+        }
+        expiresAt = now.plusMinutes(expireMinute);
+        return true;
     }
 
     public synchronized void react() {

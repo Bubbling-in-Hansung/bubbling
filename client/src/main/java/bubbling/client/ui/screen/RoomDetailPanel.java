@@ -79,10 +79,13 @@ final class RoomDetailPanel extends JPanel {
     void updateRemaining(Instant expiresAt, Instant now) {
         remaining.setVisible(expiresAt != null);
         if (expiresAt == null) return;
-        long seconds = Math.max(0, Duration.between(now, expiresAt).getSeconds());
-        long minutes = Math.max(1, (seconds + 59) / 60);
-        String text = !expiresAt.isAfter(now) ? "만료됨" : minutes >= 60
-                ? minutes / 60 + "시간 " + minutes % 60 + "분" : minutes + "분";
+        String text = "만료됨";
+        if (expiresAt.isAfter(now)) {
+            long seconds = Duration.between(now, expiresAt).plusNanos(999_999_999).getSeconds();
+            long minutes = seconds / 60;
+            String clock = minutes % 60 + "분 " + seconds % 60 + "초";
+            text = minutes >= 60 ? minutes / 60 + "시간 " + clock : clock;
+        }
         if (!text.equals(remaining.getText())) {
             remaining.setText(text);
         }

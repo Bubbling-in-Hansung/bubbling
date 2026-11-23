@@ -24,6 +24,7 @@ public class ServerComponent {
     private final UserService userService;
     private final AuthService authService;
     private final BubbleService bubbleService;
+    private final BubbleReactionService bubbleReactionService;
     private final ChatRoomService chatRoomService;
     private final ChatMessageService chatMessageService;
     private final ChatMemberService chatMemberService;
@@ -38,6 +39,7 @@ public class ServerComponent {
 
         UserStore userStore = new UserStore();
         BubbleStore bubbleStore = new BubbleStore();
+        BubbleReactionStore bubbleReactionStore = new BubbleReactionStore();
         ChatRoomStore chatRoomStore = new ChatRoomStore();
         ChatMessageStore chatMessageStore = new ChatMessageStore();
         ChatMemberStore chatMemberStore = new ChatMemberStore();
@@ -51,7 +53,8 @@ public class ServerComponent {
         this.chatMessageService = new ChatMessageService(chatMessageStore);
         this.chatRoomService = new ChatRoomService(chatRoomStore, chatMessageService, chatMemberService, chatRequestStore);
         this.chatRequestService = new ChatRequestService(chatRequestStore, chatRoomService, chatMemberService);
-        this.bubbleService = new BubbleService(bubbleStore, chatRoomService, chatRequestService);
+        this.bubbleReactionService = new BubbleReactionService(bubbleReactionStore);
+        this.bubbleService = new BubbleService(bubbleStore, bubbleReactionService, chatRoomService, chatRequestService);
 
         this.bubbleExpirationScheduler = new BubbleExpirationScheduler(bubbleService, messageSender);
 

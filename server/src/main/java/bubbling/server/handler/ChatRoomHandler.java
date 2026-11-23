@@ -58,7 +58,11 @@ public class ChatRoomHandler {
         List<ChatParticipantDto> chatParticipants = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom)
                 .stream().map(ChatParticipantMapper::toDto).toList();
         ChatRoomDto payload = ChatRoomMapper.toDto(
-                chatRoom, count, chatMember.getId(), chatParticipants
+                chatRoom,
+                count,
+                false,
+                chatMember.getId(),
+                chatParticipants
         );
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.CHAT_JOINED,
@@ -111,15 +115,10 @@ public class ChatRoomHandler {
         int count = chatMemberService.countAllActiveJoinMemberByChatRoom(chatRoom);
 
         // leave response
-        ChatLeftResponse payload = new ChatLeftResponse(
-                chatRoom.getId(),
-                bubble.getId(),
-                count
-        );
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.CHAT_LEFT,
                 message.requestId(),
-                jsonCodec.toPayload(payload)
+                null
         );
         messageSender.send(connection, response);
 
@@ -161,7 +160,7 @@ public class ChatRoomHandler {
 
         User user = connection.requireAuthenticatedUser();
 
-        ChatRoom chatRoom = chatRoomService.end(user, request.roomId());
+        ChatRoom chatRoom = chatRoomService.end(user, request.chatRoomId());
 
         ChatEndResponse payload = new ChatEndResponse(
                 chatRoom.getId(),
@@ -200,6 +199,7 @@ public class ChatRoomHandler {
                     return ChatRoomMapper.toDto(
                             chatRoom,
                             members.size(),
+                            chatRoom.getBubble().getOwner().equals(user),
                             myMember.getId(),
                             participants
                     );

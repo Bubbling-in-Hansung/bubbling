@@ -7,13 +7,17 @@ import bubbling.common.protocol.MessageType;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 
 import static bubbling.common.protocol.MessageType.*;
 
 public class ClientMessageDispatcher {
+    @FunctionalInterface
+    public interface Command {
+        void execute(MessageEnvelope message);
+    }
+
     private final JsonCodec codec = new JsonCodec();
-    private final Map<MessageType, Consumer<MessageEnvelope>> handlers = new ConcurrentHashMap<>();
+    private final Map<MessageType, Command> handlers = new ConcurrentHashMap<>();
     private volatile Runnable disconnectHandler = () -> {};
 
     public ClientMessageDispatcher() {
@@ -22,7 +26,7 @@ public class ClientMessageDispatcher {
         register(ERROR, message -> System.err.println("[ERROR] " + decodeError(message).message()));
     }
 
-    public void register(MessageType type, Consumer<MessageEnvelope> handler) {
+    public void register(MessageType type, Command handler) {
         handlers.put(type, handler);
     }
 
@@ -35,12 +39,20 @@ public class ClientMessageDispatcher {
     }
 
     public void dispatch(MessageEnvelope message) {
-        Consumer<MessageEnvelope> handler = handlers.get(message.type());
+        Command handler = handlers.get(message.type());
         if (handler == null) {
             System.out.println("처리되지 않은 메시지: " + message.type());
             return;
         }
-        handler.accept(message);
+        try {
+            handler.execute(message);
+        } catch (RuntimeException failure) {
+            reportFailure(message.type(), failure);
+        }
+    }
+
+    public void reportFailure(MessageType type, RuntimeException failure) {
+        System.err.println("메시지 처리 실패 (" + type + "): " + failure.getClass().getSimpleName());
     }
 
     public ExceptionResponse decodeError(MessageEnvelope message) {

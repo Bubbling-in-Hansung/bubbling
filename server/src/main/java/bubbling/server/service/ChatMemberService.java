@@ -7,6 +7,8 @@ import bubbling.server.domain.User;
 import bubbling.server.store.ChatMemberStore;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ChatMemberService {
 
@@ -18,10 +20,21 @@ public class ChatMemberService {
     }
 
     public ChatMember create(User user, ChatRoom chatRoom) {
+        Set<String> originSet = store.findAllByChatRoomAndIsActive(chatRoom).stream()
+                .map(ChatMember::getRandomNickname).collect(Collectors.toSet());;
+
+        String newNickname;
+        while(true) {
+            newNickname = randomNickname.getRandomNickname();
+            if(!originSet.contains(newNickname)) {
+                break;
+            }
+        }
+
         ChatMember chatMember = ChatMember.create(
                 user,
                 chatRoom,
-                randomNickname.getRandomNickname()
+                newNickname
         );
 
         return store.save(chatMember);

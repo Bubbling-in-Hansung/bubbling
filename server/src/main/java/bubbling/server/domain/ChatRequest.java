@@ -55,6 +55,11 @@ public class ChatRequest {
         this.respondedAt = LocalDateTime.now();
     }
 
+    public void cancel() {
+        validatePending();
+        this.status = ChatRequestStatus.CANCELLED;
+    }
+
     private void validatePending() {
         if (status != ChatRequestStatus.PENDING) {
             throw new BaseException(ChatRequestExceptionCode.ALREADY_PROCESSED);
@@ -62,7 +67,7 @@ public class ChatRequest {
     }
 
     private void validateOwner(User user) {
-        if (!bubble.getOwner().getId().equals(user.getId())) {
+        if (!bubble.getOwner().equals(user)) {
             throw new BaseException(ChatRequestExceptionCode.FORBIDDEN);
         }
     }

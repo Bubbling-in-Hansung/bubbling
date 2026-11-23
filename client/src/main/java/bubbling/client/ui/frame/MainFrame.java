@@ -9,14 +9,6 @@ import java.awt.*;
 
 public class MainFrame extends JFrame {
     final private ClientConfig cc;
-    public MainFrame(ClientConfig cc) {
-        this(cc, UiData.empty());
-    }
-
-    public MainFrame(ClientConfig cc, UiData data) {
-        this(cc, data, null);
-    }
-
     public MainFrame(ClientConfig cc, UiData data, LiveSession live) {
         bubbling.client.ui.style.Styles.install();
         this.cc = cc;

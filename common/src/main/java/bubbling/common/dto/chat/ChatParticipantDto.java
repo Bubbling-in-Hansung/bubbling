@@ -3,7 +3,7 @@ package bubbling.common.dto.chat;
 import bubbling.common.enums.ProfileCharacter;
 
 public record ChatParticipantDto(
-        String memberId,
+        String chatMemberId,
         String nickname,
         ProfileCharacter profile
 ) {}

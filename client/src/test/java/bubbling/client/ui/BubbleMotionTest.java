@@ -2,6 +2,7 @@ package bubbling.client.ui;
 
 import bubbling.client.ui.drawing.BubbleMotion;
 import bubbling.client.ui.model.*;
+import bubbling.common.enums.BubbleCategory;
 import org.junit.jupiter.api.Test;
 import javax.swing.*;
 import java.util.List;
@@ -9,9 +10,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BubbleMotionTest {
  private static JButton bubble(JPanel field,int x,int y,double vx,double vy){
-  RoomView view=new RoomView("방","일상","함께 이야기해요",1,4,false,false,false,0,0,0,100);
+  var session = new UiData((type, payload) -> {}).session();
+  var room = session.applyBubble(ServerRoomFixtures.bubble("room", "방", BubbleCategory.DAILY, "2099-01-01T00:00:00"));
+  room.view = new RoomView("방","일상","함께 이야기해요",1,4,false,false,false,0,0,0,100);
   JButton b=new JButton();b.setBounds(x,y,136,136);
-  b.putClientProperty("room",new UiSession(true,List.of(view)).rooms().getFirst());
+  b.putClientProperty("room",room);
   b.putClientProperty("position",new double[]{x,y});b.putClientProperty("velocity",new double[]{vx,vy});field.add(b);return b;
  }
  private static void separated(JButton a,JButton b){
