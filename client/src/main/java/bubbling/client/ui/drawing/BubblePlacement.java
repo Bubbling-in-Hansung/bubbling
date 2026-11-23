@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Random;
 import bubbling.client.ui.model.UiSession;
 
-/** Initial placement only. Relayout preserves live positions and velocities. */
+/** Places new bubbles and keeps the center of resized bubbles where space allows. */
 public final class BubblePlacement {
     private static final int SHADOW = BubbleGeometry.SHADOW_PADDING, ATTEMPTS = 600;
     private static final double GAP = BubbleGeometry.GAP;
@@ -29,7 +29,13 @@ public final class BubblePlacement {
             if (position == null) {
                 continue;
             }
-            int diameter = ((UiSession.Room) button.getClientProperty("room")).view.size();
+            int diameter = ((UiSession.Room) button.getClientProperty("room")).bubbleDiameter();
+            int size = diameter + SHADOW * 2;
+            if (button.getWidth() > 0 && button.getWidth() != size) {
+                double centerShift = (size - button.getWidth()) / 2.0;
+                position[0] = clamp(position[0] - centerShift, Math.max(0, field.getWidth() - size));
+                position[1] = clamp(position[1] - centerShift, Math.max(0, field.getHeight() - size));
+            }
             apply(button, position, diameter);
             placed.add(circle(position, diameter));
         }
@@ -39,11 +45,12 @@ public final class BubblePlacement {
                 continue;
             }
             UiSession.Room room = (UiSession.Room) button.getClientProperty("room");
-            int size = room.view.size() + SHADOW * 2;
+            int diameter = room.bubbleDiameter();
+            int size = diameter + SHADOW * 2;
             int maxX = Math.max(0, field.getWidth() - size), maxY = Math.max(0, field.getHeight() - size);
             double x = clamp(room.view.x() * field.getWidth() - SHADOW, maxX);
             double y = clamp(room.view.y() * field.getHeight() - SHADOW, maxY);
-            double radius = room.view.size() / 2.0, offset = SHADOW + radius;
+            double radius = diameter / 2.0, offset = SHADOW + radius;
             double score = overlap(x + offset, y + offset, radius, placed);
             Random random = new Random(room.id.hashCode());
             for (int attempt = 0; score > 0 && attempt < ATTEMPTS; attempt++) {
@@ -59,8 +66,8 @@ public final class BubblePlacement {
                 x, y
             };
             button.putClientProperty("position", position);
-            apply(button, position, room.view.size());
-            placed.add(circle(position, room.view.size()));
+            apply(button, position, diameter);
+            placed.add(circle(position, diameter));
         }
     }
 

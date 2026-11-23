@@ -94,7 +94,9 @@ public final class HomeScreen extends JPanel {
 
     public void refresh() {
         var rooms = session.rooms();
-        String key = category + rooms.stream().map(r -> r.id + ":" + r.people + ":" + session.hidden(r) + ":" + r.view).toList();
+        String key = category + rooms.stream()
+                .map(r -> r.id + ":" + r.people + ":" + session.hidden(r) + ":" + r.bubbleDiameter() + ":" + r.view)
+                .toList();
         if (!key.equals(signature)) {
             signature = key;
             java.util.Set<String> visible = new java.util.HashSet<>();

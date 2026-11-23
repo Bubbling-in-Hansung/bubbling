@@ -45,6 +45,13 @@ public final class UiSession {
         public List<ChatParticipantDto> participants() {
             return conversation == null || conversation.participants() == null ? List.of() : conversation.participants();
         }
+
+        public int bubbleDiameter() {
+            if (reactionCount >= 20) return view.size() + 48;
+            if (reactionCount >= 10) return view.size() + 32;
+            if (reactionCount >= 5) return view.size() + 16;
+            return view.size();
+        }
     }
 
     public record Message(String sender, String text, boolean mine, Instant at, String memberId) {}
