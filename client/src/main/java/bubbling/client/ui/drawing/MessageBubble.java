@@ -17,6 +17,7 @@ import static bubbling.client.ui.style.Styles.*;
 /** Native image slices, centered text and local expansion; stored message text is untouched. */
 public final class MessageBubble extends JPanel {
     public static final int MAX_WIDTH = 220;
+    private static final int MIN_WIDTH = 96;
     private static final int SIDE_PADDING = 12, VERTICAL_PADDING = 5;
     private static final Map<String, BufferedImage> IMAGES = new HashMap<>();
     private final boolean mine, historyStyle;
@@ -154,7 +155,7 @@ public final class MessageBubble extends JPanel {
         controlHeight = expandable ? metrics.getHeight() + 3 : 0;
         toggle.setText(expanded ? "<접기>" : "<더보기>");
         int textWidth = lines.stream().mapToInt(metrics::stringWidth).max().orElse(0);
-        int width = Math.min(MAX_WIDTH, Math.max(32, Math.max(textWidth, expandable ? metrics.stringWidth(toggle.getText())
+        int width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.max(textWidth, expandable ? metrics.stringWidth(toggle.getText())
                 : 0) + SIDE_PADDING * 2));
         // Each slice scales uniformly; extra body tiles change the overall aspect ratio.
         double scale = (double) width / (topImage == null ? 474 : topImage.getWidth());
