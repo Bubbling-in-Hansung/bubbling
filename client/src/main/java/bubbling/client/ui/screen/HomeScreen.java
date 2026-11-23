@@ -17,7 +17,7 @@ public final class HomeScreen extends JPanel {
     private static final int REFRESH_INTERVAL_MS = 500;
     private static final int MOTION_INTERVAL_MS = 30;
     private static final Color DELETE_INK = color("c5667c");
-    private final java.util.Map<String, JButton> bubbleButtons = new java.util.LinkedHashMap<>();
+    private final java.util.Map<String, BubbleButton> bubbleButtons = new java.util.LinkedHashMap<>();
     private final UiSession session;
     private final Consumer<RoomView> enter;
     private final Runnable requestsOpened;
@@ -114,17 +114,16 @@ public final class HomeScreen extends JPanel {
                     continue;
                 }
                 visible.add(r.id);
-                JButton b = bubbleButtons.get(r.id);
+                BubbleButton b = bubbleButtons.get(r.id);
                 if (b == null) {
                     b = new BubbleButton(r);
-                    b.putClientProperty("room", r);
                     int index = bubbleButtons.size();
-                    b.putClientProperty("velocity", new double[] {
+                    b.setVelocity(new double[] {
                         .35 + (index % 3) * .12, .24 + (index % 2) * .1
                     });
                     b.addActionListener(e -> {
                         selected = r;
-                        for (JButton other : bubbleButtons.values()) {
+                        for (BubbleButton other : bubbleButtons.values()) {
                             other.setSelected(other == e.getSource());
                         }
                         automatic = false;

@@ -17,14 +17,47 @@ public final class BubbleButton extends JButton {
             TITLE_INK = color("4e4860"), COUNT_INK = new Color(77, 67, 98, 166),
             OWNER_PILL_BG = color("7952dc"), LOCK_BG = new Color(255, 255, 255, 191), LOCK_INK = color("6d51b9");
     private final UiSession.Room room;
+    private double[] position;
+    private double[] velocity;
     public BubbleButton(UiSession.Room room) {
         super(room.view.title());
         this.room = room;
+        putClientProperty("room", room);
         setContentAreaFilled(false);
         setBorderPainted(false);
         setFocusPainted(false);
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         setToolTipText(room.view.title());
+    }
+
+    public UiSession.Room room() {
+        return room;
+    }
+
+    public double[] position() {
+        Object stored = getClientProperty("position");
+        if (stored instanceof double[] array && array != position) {
+            position = array;
+        }
+        return position;
+    }
+
+    public void setPosition(double[] position) {
+        this.position = position;
+        putClientProperty("position", position);
+    }
+
+    public double[] velocity() {
+        Object stored = getClientProperty("velocity");
+        if (stored instanceof double[] array && array != velocity) {
+            velocity = array;
+        }
+        return velocity;
+    }
+
+    public void setVelocity(double[] velocity) {
+        this.velocity = velocity;
+        putClientProperty("velocity", velocity);
     }
 
     @Override
