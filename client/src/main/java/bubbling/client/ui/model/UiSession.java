@@ -18,6 +18,9 @@ import java.util.function.BiConsumer;
 /** Presentation state populated by server responses and events. */
 public final class UiSession {
     private static final Duration RETRY_DELAY = Duration.ofSeconds(60);
+    private static final Duration SPEECH_LIFETIME = Duration.ofSeconds(7);
+    private static final int MAX_SPEECH_BUBBLES = 3;
+    private static final Duration ACTIVITY_WINDOW = Duration.ofSeconds(60);
     public static final class Room {
         public final String id;
         public final String bubbleId;
@@ -33,13 +36,44 @@ public final class UiSession {
         public ChatRoomDto conversation;
         private String myMemberId;
         public int historyRevision;
-        public final List<Message> messages = new ArrayList<>();
+        private final List<Message> messageLog = new ArrayList<>();
+        public final List<Message> messages = Collections.unmodifiableList(messageLog);
         private final Map<String, ChatMessageDto> received = new LinkedHashMap<>();
+        private final Map<String, Deque<Message>> recentSpeechByMember = new HashMap<>();
+        private Instant lastActivityAt;
         Room(String id, RoomView view) {
             this.id = id;
             this.bubbleId = id;
             this.view = view;
             people = view.people();
+        }
+
+        private void recordMessage(Message view) {
+            messageLog.add(view);
+            cacheMessageMetadata(view);
+        }
+
+        private void rebuildMessageCaches() {
+            recentSpeechByMember.clear();
+            lastActivityAt = null;
+            for (Message view : messageLog) {
+                cacheMessageMetadata(view);
+            }
+        }
+
+        private void cacheMessageMetadata(Message view) {
+            if (view.at() == null) return;
+            if (lastActivityAt == null || view.at().isAfter(lastActivityAt)) {
+                lastActivityAt = view.at();
+            }
+            if (view.memberId() != null) {
+                Deque<Message> deque = recentSpeechByMember.computeIfAbsent(
+                        view.memberId(), key -> new ArrayDeque<>(MAX_SPEECH_BUBBLES));
+                deque.addLast(view);
+                if (deque.size() > MAX_SPEECH_BUBBLES) {
+                    deque.removeFirst();
+                }
+            }
         }
 
         public List<ChatParticipantDto> participants() {
@@ -97,7 +131,7 @@ public final class UiSession {
         String bubbleId = bubble.bubbleId();
         int hash = bubbleId.hashCode();
         var view = new RoomView(bubble.title(), bubble.category().getLabel(),
-                ConversationMode.valueOf(bubble.method().name()).label(), bubble.currentMemberCnt(),
+                ConversationMode.fromMethod(bubble.method()).label(), bubble.currentMemberCnt(),
                 bubble.maxMemberCnt(), !bubble.isOpen(), bubble.status() == BubbleStatus.EXPIRED,
                 ownedBubbles.contains(bubbleId), Math.floorMod(hash, CharacterChoice.count()),
                 .15 + Math.floorMod(hash, 100) / 150.0, .15 + Math.floorMod(hash >>> 8, 100) / 150.0, 152);
@@ -210,7 +244,7 @@ public final class UiSession {
     public Room applyMessage(ChatMessageDto message) {
         Room room = chatRoom(message.chatRoomId());
         if (room == null || room.received.putIfAbsent(message.chatMessageId(), message) != null) return null;
-        room.messages.add(messageView(room, message));
+        room.recordMessage(messageView(room, message));
         return room;
     }
 
@@ -221,12 +255,13 @@ public final class UiSession {
 
     private void rebuildHistory(Room room) {
         var messages = room.received.values().stream().map(message -> messageView(room, message)).toList();
-        if (room.messages.equals(messages)) return;
-        if (messages.size() < room.messages.size() || !messages.subList(0, room.messages.size()).equals(room.messages)) {
+        if (room.messageLog.equals(messages)) return;
+        if (messages.size() < room.messageLog.size() || !messages.subList(0, room.messageLog.size()).equals(room.messageLog)) {
             room.historyRevision++;
-            room.messages.clear();
+            room.messageLog.clear();
         }
-        room.messages.addAll(messages.subList(room.messages.size(), messages.size()));
+        room.messageLog.addAll(messages.subList(room.messageLog.size(), messages.size()));
+        room.rebuildMessageCaches();
     }
 
     private Message messageView(Room room, ChatMessageDto message) {
@@ -267,7 +302,10 @@ public final class UiSession {
     }
 
     public Room find(RoomView view) {
-        return rooms.values().stream().filter(r -> r.view == view).findFirst().orElse(null);
+        if (view == null) return null;
+        return rooms.values().stream().filter(r -> r.view == view).findFirst()
+                .or(() -> rooms.values().stream().filter(r -> view.equals(r.view)).findFirst())
+                .orElse(null);
     }
 
     public boolean hidden(Room r) {
@@ -318,6 +356,13 @@ public final class UiSession {
         liveRequests.decideChat(q.id, accept);
     }
 
+    public void markOutgoingAccepted(Room room) {
+        Request request = outgoing(room);
+        if (request != null && request.status == ChatRequestStatus.PENDING) {
+            request.status = ChatRequestStatus.ACCEPTED;
+        }
+    }
+
     private void reject(Request q) {
         q.status = ChatRequestStatus.REJECTED;
         if (!q.incoming && rejected.add(q.id)) {
@@ -358,9 +403,24 @@ public final class UiSession {
     }
 
     public List<Message> speech(Room r, String memberId) {
-        var values = r.messages.stream().filter(m -> Objects.equals(m.memberId(), memberId)
-                && m.at() != null && m.at().plusSeconds(7).isAfter(now())).toList();
-        return values.subList(Math.max(0, values.size() - 3), values.size());
+        if (r == null || memberId == null) return List.of();
+        Deque<Message> recent = r.recentSpeechByMember.get(memberId);
+        if (recent == null || recent.isEmpty()) return List.of();
+        Instant currentNow = now();
+        List<Message> active = new ArrayList<>(recent.size());
+        for (Message message : recent) {
+            if (message.at() != null && message.at().plus(SPEECH_LIFETIME).isAfter(currentNow)) {
+                active.add(message);
+            }
+        }
+        return List.copyOf(active);
+    }
+
+    public boolean hasRecentActivity(Room r) {
+        if (r == null || r.lastActivityAt == null) return false;
+        Instant currentNow = now();
+        return !r.lastActivityAt.isAfter(currentNow)
+                && !r.lastActivityAt.isBefore(currentNow.minus(ACTIVITY_WINDOW));
     }
 
     public int character() {

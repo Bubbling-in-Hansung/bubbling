@@ -77,7 +77,6 @@ public final class SessionRequests {
     }
 
     private static BubbleMethod method(RoomView room) {
-        return Arrays.stream(ConversationMode.values()).filter(value -> value.label().equals(room.mode()))
-                .findFirst().orElseThrow().method();
+        return ConversationMode.fromLabel(room.mode()).method();
     }
 }

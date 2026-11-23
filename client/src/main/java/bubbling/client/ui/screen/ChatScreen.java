@@ -14,7 +14,6 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
-import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import static bubbling.client.ui.style.Styles.*;
@@ -522,15 +521,7 @@ public final class ChatScreen extends JPanel {
     }
 
     private void updateActivityIndicator() {
-        Instant now = session.now(), last = null;
-        if (current != null) {
-            for (UiSession.Message message : current.messages) {
-                if (message.at() != null && (last == null || message.at().isAfter(last))) {
-                    last = message.at();
-                }
-            }
-        }
-        activityIndicator.setActive(last != null && !last.isAfter(now) && !last.isBefore(now.minusSeconds(60)));
+        activityIndicator.setActive(session.hasRecentActivity(current));
     }
 
     /** Fill a short viewport so the history's vertical glue can bottom-align messages. */

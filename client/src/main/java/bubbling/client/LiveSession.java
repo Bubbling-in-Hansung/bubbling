@@ -334,10 +334,7 @@ public final class LiveSession {
             view.openLiveChat(room);
             requestHistory(chat.chatRoomId());
         } else if (message.requestId() == null && room.joined) {
-            var request = state.outgoing(room);
-            if (request != null && request.status == ChatRequestStatus.PENDING) {
-                request.status = ChatRequestStatus.ACCEPTED;
-            }
+            state.markOutgoingAccepted(room);
             view.requestApproved(chat.myMemberId(), room);
         }
         view.refreshLiveState();
