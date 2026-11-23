@@ -71,13 +71,20 @@ public final class LiveSession {
     }
 
     public void registerHandlers(ClientMessageDispatcher dispatcher) {
+        registerAuthHandlers(dispatcher);
+        registerSystemAndUserHandlers(dispatcher);
+        registerBubbleHandlers(dispatcher);
+        registerChatHandlers(dispatcher);
+    }
+
+    private void registerAuthHandlers(ClientMessageDispatcher dispatcher) {
         on(dispatcher, LOGIN_RESULT, message -> {
             if (!authMatches(message)) return;
-            signedIn(decode(message, LoginResponse.class).user());
+            signedIn(dispatcher.decode(message, LoginResponse.class).user());
         });
         on(dispatcher, REGISTER_RESULT, message -> {
             if (!authMatches(message)) return;
-            signedIn(decode(message, RegisterResponse.class).user());
+            signedIn(dispatcher.decode(message, RegisterResponse.class).user());
         });
         on(dispatcher, ERROR, message -> {
             ExceptionResponse response = dispatcher.decodeError(message);
@@ -90,75 +97,67 @@ public final class LiveSession {
                 UiErrors.show(view, new ExceptionResponse(response.code(), detail));
             }
         });
-        on(dispatcher, INITIAL_STATE, message -> {
-            if (user == null) return;
-            InitialStateDto snapshot = decode(message, InitialStateDto.class);
+    }
+
+    private void registerSystemAndUserHandlers(ClientMessageDispatcher dispatcher) {
+        onAuthenticated(dispatcher, INITIAL_STATE, InitialStateDto.class, snapshot -> {
             state.applyInitialState(snapshot);
             view.setOnline(snapshot.onlineUserCnt());
             view.refreshLiveState();
         });
         on(dispatcher, ONLINE_STATUS, message ->
-                view.setOnline(decode(message, OnlineStatusDto.class).onlineUserCnt()));
-        on(dispatcher, USER_INFO, this::applyAccount);
-        on(dispatcher, USER_UPDATED, this::applyAccount);
-        on(dispatcher, BUBBLE_CREATED, message -> {
-            if (user != null) refreshRooms();
-        });
-        on(dispatcher, BUBBLE_UPDATED, message -> {
-            if (user == null) return;
-            state.applyBubble(decode(message, BubbleDto.class));
+                view.setOnline(dispatcher.decode(message, OnlineStatusDto.class).onlineUserCnt()));
+        onAuthenticated(dispatcher, USER_INFO, UserDto.class, this::applyAccount);
+        onAuthenticated(dispatcher, USER_UPDATED, UserDto.class, this::applyAccount);
+    }
+
+    private void registerBubbleHandlers(ClientMessageDispatcher dispatcher) {
+        onAuthenticated(dispatcher, BUBBLE_CREATED, message -> refreshRooms());
+        onAuthenticated(dispatcher, BUBBLE_UPDATED, BubbleDto.class, bubble -> {
+            state.applyBubble(bubble);
             view.refreshLiveState();
             refreshRooms();
         });
-        on(dispatcher, BUBBLE_REACTED, message -> {
-            if (user == null) return;
-            BubbleReactionEvent reaction = decode(message, BubbleReactionEvent.class);
+        onAuthenticated(dispatcher, BUBBLE_REACTED, BubbleReactionEvent.class, reaction -> {
             state.updateReactionCount(reaction.bubbleId(), reaction.reactionCount());
             view.refreshLiveState();
         });
-        on(dispatcher, BUBBLE_REMOVED, message -> {
-            if (user == null) return;
-            state.markBubbleRemoved(decode(message, BubbleRemovedEvent.class));
+        onAuthenticated(dispatcher, BUBBLE_REMOVED, BubbleRemovedEvent.class, event -> {
+            state.markBubbleRemoved(event);
             view.refreshLiveState();
             refreshRooms();
         });
-        on(dispatcher, MY_CHAT_ROOM_LIST, message -> {
-            if (user == null) return;
-            state.applyChatRooms(decode(message, ChatRoomDto[].class));
+    }
+
+    private void registerChatHandlers(ClientMessageDispatcher dispatcher) {
+        onAuthenticated(dispatcher, MY_CHAT_ROOM_LIST, ChatRoomDto[].class, rooms -> {
+            state.applyChatRooms(rooms);
             view.refreshLiveState();
         });
-        on(dispatcher, CHAT_JOINED, this::openRoom);
-        on(dispatcher, CHAT_LEFT, message -> {
-            if (user == null) return;
+        onAuthenticated(dispatcher, CHAT_JOINED, message ->
+                openRoom(message.requestId(), dispatcher.decode(message, ChatRoomDto.class)));
+        onAuthenticated(dispatcher, CHAT_LEFT, message -> {
             String bubbleId = leaveRequests.remove(message.requestId());
             if (bubbleId == null) return;
             state.markLeft(bubbleId);
             view.returnFromChat(bubbleId);
             refreshRooms();
         });
-        on(dispatcher, CHAT_ENDED, message -> {
-            if (user == null) return;
-            ChatEndResponse response = decode(message, ChatEndResponse.class);
+        onAuthenticated(dispatcher, CHAT_ENDED, ChatEndResponse.class, response -> {
             state.markEnded(response);
             view.returnFromChat(response.bubbleId());
             view.refreshLiveState();
             refreshRooms();
         });
         for (MessageType type : new MessageType[] {CHAT_MEMBER_JOINED, CHAT_MEMBER_LEFT}) {
-            on(dispatcher, type, message -> {
-                if (user != null) refreshRooms();
-            });
+            onAuthenticated(dispatcher, type, message -> refreshRooms());
         }
-        on(dispatcher, CHAT_MEMBER_COUNT_CHANGED, message -> {
-            if (user == null) return;
-            ChatMemberCountEvent count = decode(message, ChatMemberCountEvent.class);
+        onAuthenticated(dispatcher, CHAT_MEMBER_COUNT_CHANGED, ChatMemberCountEvent.class, count -> {
             state.updateMemberCount(count.bubbleId(), count.currentMemberCnt());
             view.refreshLiveState();
         });
         for (MessageType type : new MessageType[] {CHAT_REQUESTED, CHAT_ACCEPTED, CHAT_REJECTED}) {
-            on(dispatcher, type, message -> {
-                if (user == null) return;
-                ChatRequestDto request = decode(message, ChatRequestDto.class);
+            onAuthenticated(dispatcher, type, ChatRequestDto.class, request -> {
                 boolean added = state.applyRequest(request);
                 if (added && type == CHAT_REQUESTED && request.role() == ChatRequestRole.OWNER
                         && request.status() == ChatRequestStatus.PENDING) {
@@ -167,21 +166,32 @@ public final class LiveSession {
                 view.refreshLiveState();
             });
         }
-        on(dispatcher, CHAT_HISTORY, message -> {
-            if (user == null) return;
+        onAuthenticated(dispatcher, CHAT_HISTORY, message -> {
             String roomId = historyRequests.remove(message.requestId());
             if (roomId == null) return;
-            state.applyHistory(roomId, decode(message, ChatMessageDto[].class));
+            state.applyHistory(roomId, dispatcher.decode(message, ChatMessageDto[].class));
             view.refreshLiveState();
         });
-        on(dispatcher, CHAT_MESSAGE, message -> {
-            if (user == null) return;
-            var room = state.applyMessage(decode(message, ChatMessageDto.class));
+        onAuthenticated(dispatcher, CHAT_MESSAGE, message -> {
+            var room = state.applyMessage(dispatcher.decode(message, ChatMessageDto.class));
             if (room != null && message.requestId() == null) {
                 view.chatMessageReceived(room);
             }
             view.refreshLiveState();
         });
+    }
+
+    private void onAuthenticated(ClientMessageDispatcher dispatcher, MessageType type,
+            ClientMessageDispatcher.Command handler) {
+        on(dispatcher, type, message -> {
+            if (user == null) return;
+            handler.execute(message);
+        });
+    }
+
+    private <T> void onAuthenticated(ClientMessageDispatcher dispatcher, MessageType type,
+            Class<T> payloadType, Consumer<T> handler) {
+        onAuthenticated(dispatcher, type, message -> handler.accept(dispatcher.decode(message, payloadType)));
     }
 
     private void on(ClientMessageDispatcher dispatcher, MessageType type, ClientMessageDispatcher.Command handler) {
@@ -263,9 +273,8 @@ public final class LiveSession {
         refreshRooms();
     }
 
-    private void applyAccount(MessageEnvelope message) {
-        if (user == null) return;
-        user = decode(message, UserDto.class);
+    private void applyAccount(UserDto account) {
+        user = Objects.requireNonNull(account);
         view.updateAccount(user);
     }
 
@@ -324,23 +333,17 @@ public final class LiveSession {
         send(MY_CHAT_ROOM_LIST_REQUEST, null);
     }
 
-    private void openRoom(MessageEnvelope message) {
-        if (user == null) return;
-        ChatRoomDto chat = decode(message, ChatRoomDto.class);
+    private void openRoom(String requestId, ChatRoomDto chat) {
         UiSession.Room room = state.applyChatRoom(chat);
-        boolean requested = opening != null && opening.equals(message.requestId());
+        boolean requested = opening != null && opening.equals(requestId);
         if (requested) opening = null;
         if (requested) {
             view.openLiveChat(room);
             requestHistory(chat.chatRoomId());
-        } else if (message.requestId() == null && room.joined) {
+        } else if (requestId == null && room.joined) {
             state.markOutgoingAccepted(room);
             view.requestApproved(chat.myMemberId(), room);
         }
         view.refreshLiveState();
-    }
-
-    private <T> T decode(MessageEnvelope message, Class<T> type) {
-        return Objects.requireNonNull(codec.fromPayload(message.payload(), type));
     }
 }
