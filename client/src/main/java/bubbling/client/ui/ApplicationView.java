@@ -170,7 +170,7 @@ public final class ApplicationView extends JPanel {
         sidebar.setOpaque(true);
         sidebar.setBackground(Color.WHITE);
         sidebar.setBorder(BorderFactory.createMatteBorder(0, 0, 0, 1, LINE));
-        sidebar.setPreferredSize(new Dimension(72, 0));
+        sidebar.setPreferredSize(new Dimension(86, 0));
         JPanel top = column();
         top.setBorder(BorderFactory.createEmptyBorder(20, 7, 0, 7));
         homeButton = button("홈", false, () -> showPage(HOME));
@@ -183,6 +183,7 @@ public final class ApplicationView extends JPanel {
         homeButton.setSelected(true);
         homeButton.setPreferredSize(new Dimension(58, 56));
         homeButton.setMaximumSize(new Dimension(58, 56));
+        homeButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         top.add(homeButton);
         top.add(Box.createVerticalStrut(10));
         chatButton = button("채팅", false, () -> showPage(CONVERSATIONS));
@@ -194,6 +195,7 @@ public final class ApplicationView extends JPanel {
         chatButton.setFont(UiFonts.body(9, 700));
         chatButton.setPreferredSize(new Dimension(58, 56));
         chatButton.setMaximumSize(new Dimension(58, 56));
+        chatButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         top.add(chatButton);
         sidebar.add(top, BorderLayout.NORTH);
         JPanel bottom = column();
@@ -233,6 +235,7 @@ public final class ApplicationView extends JPanel {
         profile.setToolTipText("마이페이지");
         profile.getAccessibleContext().setAccessibleName("마이페이지");
         append(bottom, profile, 8);
+        profile.setAlignmentX(Component.CENTER_ALIGNMENT);
         JButton logout = button("", false, this::leaveApplication);
         logout.setIcon(icon("logout"));
         logout.putClientProperty("flat", true);
@@ -240,6 +243,7 @@ public final class ApplicationView extends JPanel {
         logout.setToolTipText(logoutLabel);
         logout.getAccessibleContext().setAccessibleName(logoutLabel);
         append(bottom, logout, 5);
+        logout.setAlignmentX(Component.CENTER_ALIGNMENT);
         sidebar.add(bottom, BorderLayout.SOUTH);
         return sidebar;
     }
