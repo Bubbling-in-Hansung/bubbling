@@ -89,27 +89,29 @@ public final class ConversationListScreen extends JPanel {
         row.setLayout(new BorderLayout(16, 0));
         pad(row, 18);
         JPanel copy = column();
-        append(copy, label((r.ended ? "종료됨" : "진행 중") + (r.view.category() == null ? "" : " · " + r.view.category()), 10, PURPLE), 6);
-        JLabel roomTitle = title(r.view.title(), 13);
+        append(copy, label((r.ended ? "종료됨" : "진행 중") + (r.view.category() == null ? "" : " · " + r.view.category()), 11, PURPLE), 6);
+        JLabel roomTitle = title(r.view.title(), 15);
+        roomTitle.setToolTipText(r.view.title());
         String notification = notificationDescription.apply(r);
-        if (notification != null) {
-            roomTitle.setIcon(NOTIFICATION_BADGE);
-            roomTitle.setHorizontalTextPosition(SwingConstants.LEFT);
-            roomTitle.setIconTextGap(7);
-            roomTitle.setToolTipText(notification);
-            roomTitle.getAccessibleContext().setAccessibleDescription(notification);
-        }
         JButton reaction = reactionButton(() -> session.react(r));
         updateReactionButton(reaction, r.reactionCount, session.canReact(r));
         JPanel titleRow = panel(null);
         titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
         roomTitle.setMinimumSize(new Dimension(0, roomTitle.getPreferredSize().height));
         titleRow.add(roomTitle);
+        if (notification != null) {
+            JLabel badge = new JLabel(NOTIFICATION_BADGE);
+            badge.setToolTipText(notification);
+            badge.getAccessibleContext().setAccessibleName(notification);
+            roomTitle.getAccessibleContext().setAccessibleDescription(notification);
+            titleRow.add(Box.createHorizontalStrut(7));
+            titleRow.add(badge);
+        }
         titleRow.add(Box.createHorizontalStrut(4));
         titleRow.add(reaction);
         titleRow.add(Box.createHorizontalGlue());
         append(copy, titleRow, 6);
-        append(copy, label((r.view.mode() == null ? "" : r.view.mode() + " · ") + r.people + " / " + r.view.capacity() + "명", 10, MUTED), 0);
+        append(copy, label((r.view.mode() == null ? "" : r.view.mode() + " · ") + r.people + " / " + r.view.capacity() + "명", 11, MUTED), 0);
         row.add(copy);
         JButton action = button(r.ended ? "기록 보기" : "대화로 이동", false,
                 () -> UiErrors.perform(this, () -> enter.accept(r.view)));
