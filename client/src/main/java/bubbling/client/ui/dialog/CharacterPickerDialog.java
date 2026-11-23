@@ -9,6 +9,8 @@ import java.util.function.IntConsumer;
 import static bubbling.client.ui.style.Styles.*;
 
 public final class CharacterPickerDialog extends JDialog {
+    private static final Color PREVIEW_TOP = color("faf7ff"), PREVIEW_BOTTOM = color("e8e0f8"),
+            CARD_HOVER = color("f7f2ff"), CARD_BORDER_ACTIVE = color("9779e7");
     private int selected;
     public CharacterPickerDialog(Window owner, int initial, boolean editable, IntConsumer save) {
         super(owner, "프로필 캐릭터 선택", ModalityType.APPLICATION_MODAL);
@@ -24,11 +26,11 @@ public final class CharacterPickerDialog extends JDialog {
                 var g = graphics(source);
                 int center = getWidth() / 2;
                 g.setPaint(new RadialGradientPaint(center, getHeight() * .4f, 156,
-                        new float[] {0, 1}, new Color[] {color("faf7ff"), color("e8e0f8")}));
+                        new float[] {0, 1}, new Color[] {PREVIEW_TOP, PREVIEW_BOTTOM}));
                 g.fillRoundRect(0, 0, getWidth(), getHeight(), 30, 30);
                 CharacterArt.paint(g, center - 58, (getHeight() - 218) / 2, 1.6, selected);
                 centered(g, CharacterChoice.at(selected).label(), center, getHeight() - 49, 14, PURPLE);
-                centered(g, "선택한 캐릭터 미리보기", center, getHeight() - 26, 10, color("736b80"));
+                centered(g, "선택한 캐릭터 미리보기", center, getHeight() - 26, 10, SUBTLE);
                 g.dispose();
             }
         };
@@ -83,8 +85,8 @@ public final class CharacterPickerDialog extends JDialog {
                     CharacterArt.paint((Graphics2D) g, x, y, .72, index);
                 }
             });
-            setForeground(color("625b70"));
-            addItemListener(event -> setForeground(isSelected() ? PURPLE : color("625b70")));
+            setForeground(COPY);
+            addItemListener(event -> setForeground(isSelected() ? PURPLE : COPY));
         }
 
         @Override
@@ -92,9 +94,9 @@ public final class CharacterPickerDialog extends JDialog {
             Graphics2D g = graphics(source);
             int w = getWidth();
             int h = getHeight();
-            g.setColor(isSelected() ? SOFT : color(getModel().isRollover() ? "f7f2ff" : "fbfafd"));
+            g.setColor(isSelected() ? SOFT : (getModel().isRollover() ? CARD_HOVER : SURFACE));
             g.fillRoundRect(1, 1, w - 2, h - 2, 24, 24);
-            g.setColor(isSelected() || hasFocus() ? color("9779e7") : LINE);
+            g.setColor(isSelected() || hasFocus() ? CARD_BORDER_ACTIVE : LINE);
             g.drawRoundRect(1, 1, w - 3, h - 3, 24, 24);
             if (hasFocus()) {
                 g.drawRoundRect(4, 4, w - 9, h - 9, 20, 20);

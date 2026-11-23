@@ -6,6 +6,8 @@ import static bubbling.client.ui.style.Styles.*;
 
 /** Overlays never consume a strip of the bubble field. All dimensions are logical pixels. */
 public final class BubbleStage extends JPanel {
+    private static final Color SUBTITLE_INK = color("777388"), STAGE_MID = color("fbfaff"),
+            STAGE_EDGE = color("f7f5fc"), GLOW_PURPLE = color("eee8ff"), GLOW_CYAN = color("e5f8fa");
     private final JPanel field;
     private final JPanel heading = column();
     private final JButton requests, create;
@@ -17,7 +19,7 @@ public final class BubbleStage extends JPanel {
         JLabel headline = label("오늘도 수많은 마음이 떠다니고 있어요", 16, Color.BLACK);
         headline.setFont(bubbling.client.ui.style.UiFonts.body(16, 600));
         append(heading, headline, 4);
-        append(heading, label("마음이 가는 비눗방울을 눌러 이야기를 나눠보세요", 12, color("777388")), 0);
+        append(heading, label("마음이 가는 비눗방울을 눌러 이야기를 나눠보세요", 12, SUBTITLE_INK), 0);
         requests = button("참여 요청 관리", false, manage);
         requests.putClientProperty("flat", true);
         requests.putClientProperty("soft", true);
@@ -62,11 +64,11 @@ public final class BubbleStage extends JPanel {
             g.setPaint(new RadialGradientPaint(w * .48f, h * .38f, Math.max(w, h) * .72f, new float[] {
                 0, .5f, 1
             }, new Color[] {
-                Color.WHITE, color("fbfaff"), color("f7f5fc")
+                Color.WHITE, STAGE_MID, STAGE_EDGE
             }));
             g.fillRect(0, 0, w, h);
-            glow(g, w * .24f, h * .18f, 420, color("eee8ff"));
-            glow(g, w - 350, h - 260, 350, color("e5f8fa"));
+            glow(g, w * .24f, h * .18f, 420, GLOW_PURPLE);
+            glow(g, w - 350, h - 260, 350, GLOW_CYAN);
         }
         g.dispose();
     }

@@ -19,6 +19,8 @@ public final class MessageBubble extends JPanel {
     public static final int MAX_WIDTH = 220;
     private static final int MIN_WIDTH = 96;
     private static final int SIDE_PADDING = 12, VERTICAL_PADDING = 5;
+    private static final int SLICE_BASE_WIDTH = 474, TOP_SLICE_HEIGHT = 105, BODY_SLICE_HEIGHT = 100,
+            BOTTOM_SLICE_HEIGHT = 105, TAIL_SLICE_HEIGHT = 39;
     private static final Map<String, BufferedImage> IMAGES = new HashMap<>();
     private final boolean mine, historyStyle;
     private final BufferedImage topImage, bodyImage, bottomImage;
@@ -158,11 +160,15 @@ public final class MessageBubble extends JPanel {
         int width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.max(textWidth, expandable ? metrics.stringWidth(toggle.getText())
                 : 0) + SIDE_PADDING * 2));
         // Each slice scales uniformly; extra body tiles change the overall aspect ratio.
-        double scale = (double) width / (topImage == null ? 474 : topImage.getWidth());
-        topHeight = Math.max(1, (int) Math.round((topImage == null ? 105 : topImage.getHeight()) * scale));
-        bottomHeight = Math.max(1, (int) Math.round(width * (bottomImage == null ? 105.0 / 474 : (double) bottomImage.getHeight() / bottomImage.getWidth())));
-        tileHeight = Math.max(1, (int) Math.round(width * (bodyImage == null ? 100.0 / 474 : (double) bodyImage.getHeight() / bodyImage.getWidth())));
-        tailHeight = Math.max(1, (int) Math.ceil(bottomHeight * 39.0 / 105));
+        double scale = (double) width / (topImage == null ? SLICE_BASE_WIDTH : topImage.getWidth());
+        topHeight = Math.max(1, (int) Math.round((topImage == null ? TOP_SLICE_HEIGHT : topImage.getHeight()) * scale));
+        bottomHeight = Math.max(1, (int) Math.round(width * (bottomImage == null
+                ? (double) BOTTOM_SLICE_HEIGHT / SLICE_BASE_WIDTH
+                : (double) bottomImage.getHeight() / bottomImage.getWidth())));
+        tileHeight = Math.max(1, (int) Math.round(width * (bodyImage == null
+                ? (double) BODY_SLICE_HEIGHT / SLICE_BASE_WIDTH
+                : (double) bodyImage.getHeight() / bodyImage.getWidth())));
+        tailHeight = Math.max(1, (int) Math.ceil(bottomHeight * (double) TAIL_SLICE_HEIGHT / BOTTOM_SLICE_HEIGHT));
         int naturalTextHeight = lines.size() * metrics.getHeight();
         int fixedHeight = topHeight + bottomHeight;
         int textBudget = Math.max(metrics.getHeight(), availableHeight - fixedHeight - controlHeight * 2 - VERTICAL_PADDING * 2 - tileHeight);

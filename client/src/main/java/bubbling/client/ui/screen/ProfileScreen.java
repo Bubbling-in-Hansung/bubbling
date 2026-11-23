@@ -14,10 +14,12 @@ import java.util.function.Consumer;
 import static bubbling.client.ui.style.Styles.*;
 
 public final class ProfileScreen extends JPanel {
+    private static final int MAX_CONTENT_WIDTH = 980;
+    private static final Color ART_BG = color("eee7fb");
     private final JPanel content = new JPanel() {
         @Override
         public Dimension getMaximumSize() {
-            return new Dimension(980, super.getMaximumSize().height);
+            return new Dimension(MAX_CONTENT_WIDTH, super.getMaximumSize().height);
         }
     };
     private final UiSession session;
@@ -43,7 +45,7 @@ public final class ProfileScreen extends JPanel {
         JComponent art = new JComponent() {
             protected void paintComponent(Graphics s) {
                 Graphics2D g = graphics(s);
-                g.setColor(color("eee7fb"));
+                g.setColor(ART_BG);
                 g.fillRoundRect(0, 0, 130, 145, 50, 50);
                 CharacterArt.paint(g, 20, 15, 1.25, session.character());
                 g.dispose();
@@ -71,7 +73,7 @@ public final class ProfileScreen extends JPanel {
         append(content, hero, 27);
         JPanel centered = new JPanel(new BorderLayout()) {
             public void doLayout() {
-                int width = Math.min(980, getWidth());
+                int width = Math.min(MAX_CONTENT_WIDTH, getWidth());
                 content.setBounds((getWidth() - width) / 2, 0, width, Math.max(content.getPreferredSize().height, getHeight()));
             }
         };

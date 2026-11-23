@@ -13,6 +13,10 @@ public final class HomeScreen extends JPanel {
     private static final double MOTION_SPEED_MULTIPLIER = 10.0;
     private static final int DETAIL_WIDTH = 408;
     private static final int COMPACT_DETAIL_WIDTH = 384;
+    private static final int COMPACT_SCREEN_WIDTH = 1028;
+    private static final int REFRESH_INTERVAL_MS = 500;
+    private static final int MOTION_INTERVAL_MS = 30;
+    private static final Color DELETE_INK = color("c5667c");
     private final java.util.Map<String, JButton> bubbleButtons = new java.util.LinkedHashMap<>();
     private final UiSession session;
     private final Consumer<RoomView> enter;
@@ -28,7 +32,8 @@ public final class HomeScreen extends JPanel {
     private record DetailState(String roomId, RoomView view, int people, boolean joined, boolean ended,
             boolean hidden, long retrySeconds, String requestId, ChatRequestStatus requestStatus) {
     }
-    private final javax.swing.Timer motion = new javax.swing.Timer(30, e -> BubbleMotion.advance(field, MOTION_SPEED_MULTIPLIER));
+    private final javax.swing.Timer motion = new javax.swing.Timer(MOTION_INTERVAL_MS,
+            e -> BubbleMotion.advance(field, MOTION_SPEED_MULTIPLIER));
     public HomeScreen(UiData data, Consumer<RoomView> enter, Runnable requestsOpened) {
         super(new BorderLayout());
         session = data.session();
@@ -51,7 +56,7 @@ public final class HomeScreen extends JPanel {
         detail.add(detailScroll);
         detail.setVisible(false);
         add(detail, BorderLayout.EAST);
-        timer = new javax.swing.Timer(500, e -> refresh());
+        timer = new javax.swing.Timer(REFRESH_INTERVAL_MS, e -> refresh());
         addHierarchyListener(e -> {
             if (isShowing()) {
                 refresh();
@@ -64,7 +69,7 @@ public final class HomeScreen extends JPanel {
         });
         addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentResized(java.awt.event.ComponentEvent e) {
-                int detailWidth = getWidth() <= 1028 ? COMPACT_DETAIL_WIDTH : DETAIL_WIDTH;
+                int detailWidth = getWidth() <= COMPACT_SCREEN_WIDTH ? COMPACT_DETAIL_WIDTH : DETAIL_WIDTH;
                 if (detail.getPreferredSize().width != detailWidth) {
                     detail.setPreferredSize(new Dimension(detailWidth, 0));
                     revalidate();
@@ -213,7 +218,7 @@ public final class HomeScreen extends JPanel {
             edit.setText("수정");
             edit.setIcon(penIcon());
             remove.setText("삭제");
-            remove.setForeground(color("c5667c"));
+            remove.setForeground(DELETE_INK);
             edit.setFont(font(11, false));
             remove.setFont(font(11, false));
             ownerActions.add(edit);

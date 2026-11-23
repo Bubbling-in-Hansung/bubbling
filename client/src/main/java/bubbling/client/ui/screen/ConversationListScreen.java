@@ -15,7 +15,7 @@ public final class ConversationListScreen extends JPanel {
 
         public void paintIcon(Component source, Graphics sourceGraphics, int x, int y) {
             Graphics2D g = graphics(sourceGraphics);
-            g.setColor(color("c93d60"));
+            g.setColor(BADGE_RED);
             g.fillOval(x, y, getIconWidth(), getIconHeight());
             g.setFont(font(11, true));
             FontMetrics metrics = g.getFontMetrics();

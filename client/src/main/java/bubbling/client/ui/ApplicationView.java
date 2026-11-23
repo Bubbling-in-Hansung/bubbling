@@ -23,6 +23,8 @@ public final class ApplicationView extends JPanel {
     private static final int HEADER_PADDING_Y = 6;
     private static final int HEADER_HEIGHT = 62 + 2 * HEADER_PADDING_Y;
     private static final int HEADER_ACCOUNT_RIGHT_PADDING = 36;
+    private static final int COMPACT_HEADER_WIDTH = 1100;
+    private static final Color PROFILE_BG = color("f4f0ff"), PROFILE_BORDER = color("e8e0ff");
     private final CardLayout pages = new CardLayout();
     private final JPanel deck = new JPanel(pages);
     private final HomeScreen home;
@@ -123,12 +125,7 @@ public final class ApplicationView extends JPanel {
         user.setPreferredSize(new Dimension(207 + HEADER_ACCOUNT_RIGHT_PADDING, 62));
         JComponent dot = new JComponent() {
             protected void paintComponent(Graphics source) {
-                var g = graphics(source);
-                g.setColor(color("e7f9f3"));
-                g.fillOval(0, 0, 16, 16);
-                g.setColor(color("52d4aa"));
-                g.fillOval(4, 4, 8, 8);
-                g.dispose();
+                paintStatusDot(source, 16, 4, 8, true);
             }
         };
         dot.setPreferredSize(new Dimension(16, 16));
@@ -151,7 +148,7 @@ public final class ApplicationView extends JPanel {
         header.add(user, BorderLayout.EAST);
         header.addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentResized(java.awt.event.ComponentEvent e) {
-                boolean compact = header.getWidth() <= 1100;
+                boolean compact = header.getWidth() <= COMPACT_HEADER_WIDTH;
                 brand.setPreferredSize(new Dimension(compact ? 180 : 206, 62));
                 user.setPreferredSize(new Dimension((compact ? 167 : 207) + HEADER_ACCOUNT_RIGHT_PADDING, 62));
                 for (Component c : tabs.getComponents()) {
@@ -203,9 +200,9 @@ public final class ApplicationView extends JPanel {
         JButton profile = new JButton() {
             protected void paintComponent(Graphics source) {
                 var g = graphics(source);
-                g.setColor(color("f4f0ff"));
+                g.setColor(PROFILE_BG);
                 g.fillOval(0, 0, 39, 39);
-                g.setColor(color("e8e0ff"));
+                g.setColor(PROFILE_BORDER);
                 g.drawOval(0, 0, 39, 39);
                 g.dispose();
                 super.paintComponent(source);
@@ -336,7 +333,7 @@ public final class ApplicationView extends JPanel {
                 int badgeX = x + getIconWidth() - width;
                 g.setColor(Color.WHITE);
                 g.fillRoundRect(badgeX - 1, y - 1, width + 2, 17, 17, 17);
-                g.setColor(color("c93d60"));
+                g.setColor(BADGE_RED);
                 g.fillRoundRect(badgeX, y, width, 15, 15, 15);
                 g.setColor(Color.WHITE);
                 g.drawString(count, badgeX + (width - metrics.stringWidth(count)) / 2,

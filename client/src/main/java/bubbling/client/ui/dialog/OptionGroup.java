@@ -44,6 +44,9 @@ final class OptionGroup<T> extends JPanel {
     }
 
     private static final class ChoiceButton extends JToggleButton {
+        private static final Color HIGHLIGHT_BG = color("f3efff"), FOCUS_HALO = color("eee8ff"),
+                ACTIVE_BORDER = color("9c80ec"), IDLE_BORDER = color("e9e4ef"), ACTIVE_INK = color("6f4cd2"),
+                IDLE_INK = color("635d6c"), ACTIVE_DESC = color("8a70d7"), IDLE_DESC = color("9a94a3");
         private final String description;
         private final Icon choiceIcon;
 
@@ -65,15 +68,15 @@ final class OptionGroup<T> extends JPanel {
         protected void paintComponent(Graphics source) {
             Graphics2D g = graphics(source);
             boolean highlighted = isSelected() || getModel().isRollover();
-            g.setColor(color(highlighted ? "f3efff" : "fbfafd"));
+            g.setColor(highlighted ? HIGHLIGHT_BG : SURFACE);
             g.fillRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 22, 22);
             if (isSelected() || hasFocus()) {
-                g.setColor(color("eee8ff"));
+                g.setColor(FOCUS_HALO);
                 g.setStroke(new BasicStroke(3));
                 g.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 22, 22);
             }
             g.setStroke(new BasicStroke(1));
-            g.setColor(color(isSelected() || hasFocus() ? "9c80ec" : "e9e4ef"));
+            g.setColor(isSelected() || hasFocus() ? ACTIVE_BORDER : IDLE_BORDER);
             g.drawRoundRect(1, 1, getWidth() - 3, getHeight() - 3, 22, 22);
             int left = 11;
             if (choiceIcon != null) {
@@ -82,7 +85,7 @@ final class OptionGroup<T> extends JPanel {
             }
             g.clipRect(left, 2, Math.max(0, getWidth() - left - 8), getHeight() - 4);
             g.setFont(getFont());
-            g.setColor(color(isSelected() ? "6f4cd2" : "635d6c"));
+            g.setColor(isSelected() ? ACTIVE_INK : IDLE_INK);
             FontMetrics metrics = g.getFontMetrics();
             int baseline = description.isEmpty() ? (getHeight() - metrics.getHeight()) / 2 + metrics.getAscent()
                     : getHeight() / 2 - 6;
@@ -90,7 +93,7 @@ final class OptionGroup<T> extends JPanel {
             g.drawString(getText(), x, baseline);
             if (!description.isEmpty()) {
                 g.setFont(font(7, false));
-                g.setColor(color(isSelected() ? "8a70d7" : "9a94a3"));
+                g.setColor(isSelected() ? ACTIVE_DESC : IDLE_DESC);
                 g.drawString(description, left, baseline + 21);
             }
             g.dispose();

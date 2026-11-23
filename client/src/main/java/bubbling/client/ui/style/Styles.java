@@ -7,7 +7,13 @@ import java.awt.geom.Path2D;
 /** CSS tokens and native Swing controls; no HTML renderer. */
 public final class Styles {
     public static final Color BG = color("faf9fe"), INK = color("29263a"), MUTED = color("aaa5b5"), PURPLE = color("7952de"),
-            LINE = color("ebe8f4"), SOFT = color("f2efff");
+            LINE = color("ebe8f4"), SOFT = color("f2efff"), SUBTLE = color("736b80"), COPY = color("625b70"),
+            SURFACE = color("fbfafd"), DANGER_BG = color("fff0f4"), DANGER_INK = color("a44660"),
+            BADGE_RED = color("c93d60"), ACTIVE_BG = color("e7f9f3"), ACTIVE_DOT = color("52d4aa");
+    private static final Color DISABLED_FILL = color("e8e5ed"), CATEGORY_HOVER_BG = color("eee9ff"),
+            TRANSPARENT = new Color(0, 0, 0, 0), GRADIENT_START = color("8254f6"), GRADIENT_END = color("6740dc"),
+            CLOSE_BG = color("f6f4f9"), CLOSE_INK = color("9e99aa"), CATEGORY_ACTIVE_INK = color("6540d8"),
+            CATEGORY_IDLE_INK = color("777388"), HEART_DISABLED = color("c98797"), INACTIVE_BG = color("f1eef5");
     private Styles() {
     }
 
@@ -75,7 +81,7 @@ public final class Styles {
                 Graphics2D g = graphics(source);
                 Color fill = primary ? PURPLE : (getModel().isRollover() || isSelected() ? SOFT : Color.WHITE);
                 if (!isEnabled()) {
-                    fill = color("e8e5ed");
+                    fill = DISABLED_FILL;
                 }
                 boolean borderless = Boolean.TRUE.equals(getClientProperty("borderless"));
                 if (borderless && isEnabled() && hasFocus()) {
@@ -95,10 +101,10 @@ public final class Styles {
                     fill = hoverColor;
                 }
                 if (category) {
-                    fill = getModel().isRollover() || isSelected() || hasFocus() ? color("eee9ff") : new Color(0, 0, 0, 0);
+                    fill = getModel().isRollover() || isSelected() || hasFocus() ? CATEGORY_HOVER_BG : TRANSPARENT;
                 }
                 if (gradient && isEnabled()) {
-                    g.setPaint(new GradientPaint(0, 0, color("8254f6"), getWidth(), getHeight(), color("6740dc")));
+                    g.setPaint(new GradientPaint(0, 0, GRADIENT_START, getWidth(), getHeight(), GRADIENT_END));
                 } else {
                     g.setColor(fill);
                 }
@@ -132,8 +138,8 @@ public final class Styles {
         JButton close = button("", false, action);
         close.putClientProperty("flat", true);
         close.putClientProperty("soft", true);
-        close.setBackground(color("f6f4f9"));
-        close.setForeground(color("9e99aa"));
+        close.setBackground(CLOSE_BG);
+        close.setForeground(CLOSE_INK);
         close.setIcon(icon("close"));
         close.setBorder(BorderFactory.createEmptyBorder());
         close.setPreferredSize(new Dimension(34, 34));
@@ -210,7 +216,7 @@ public final class Styles {
 
     private static void updateCategoryTab(JButton tab, boolean highlighted) {
         tab.setFont(UiFonts.body(12, highlighted ? 700 : 400));
-        tab.setForeground(color(highlighted ? "6540d8" : "777388"));
+        tab.setForeground(highlighted ? CATEGORY_ACTIVE_INK : CATEGORY_IDLE_INK);
     }
 
     /** Prototype's 24-unit pen path, rendered natively at 19px rather than a font-dependent emoji. */
@@ -297,7 +303,7 @@ public final class Styles {
                     g.drawArc(8, 3, 6, 12, 0, 180);
                     g.fillOval(10, 13, 2, 3);
                 } else if (name.equals("heart")) {
-                    g.setColor(color(c.isEnabled() ? "c93d60" : "c98797"));
+                    g.setColor(c.isEnabled() ? BADGE_RED : HEART_DISABLED);
                     Path2D heart = new Path2D.Float();
                     heart.moveTo(11, 18);
                     heart.curveTo(9, 16, 3, 12, 3, 8);
@@ -393,6 +399,15 @@ public final class Styles {
         g.setFont(font(size, false));
         g.setColor(c);
         g.drawString(text, x - g.getFontMetrics().stringWidth(text) / 2, y);
+    }
+
+    public static void paintStatusDot(Graphics source, int size, int innerOffset, int innerSize, boolean active) {
+        Graphics2D g = graphics(source);
+        g.setColor(active ? ACTIVE_BG : INACTIVE_BG);
+        g.fillOval(0, 0, size, size);
+        g.setColor(active ? ACTIVE_DOT : MUTED);
+        g.fillOval(innerOffset, innerOffset, innerSize, innerSize);
+        g.dispose();
     }
 
     public static void logo(Graphics2D g, int x, int y, Color c, int size) {
