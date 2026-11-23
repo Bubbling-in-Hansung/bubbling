@@ -11,6 +11,8 @@ import static bubbling.client.ui.style.Styles.*;
 
 public final class HomeScreen extends JPanel {
     private static final double MOTION_SPEED_MULTIPLIER = 10.0;
+    private static final int DETAIL_WIDTH = 408;
+    private static final int COMPACT_DETAIL_WIDTH = 384;
     private final java.util.Map<String, JButton> bubbleButtons = new java.util.LinkedHashMap<>();
     private final UiSession session;
     private final Consumer<RoomView> enter;
@@ -40,7 +42,7 @@ public final class HomeScreen extends JPanel {
                 () -> new RoomEditor(SwingUtilities.getWindowAncestor(this), null,
                 session, this::refresh).setVisible(true));
         add(center);
-        detail.setPreferredSize(new Dimension(340, 0));
+        detail.setPreferredSize(new Dimension(DETAIL_WIDTH, 0));
         detail.setOpaque(true);
         detail.setBackground(Color.WHITE);
         detail.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, LINE));
@@ -62,9 +64,11 @@ public final class HomeScreen extends JPanel {
         });
         addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentResized(java.awt.event.ComponentEvent e) {
-                detail.setPreferredSize(new Dimension(getWidth() <= 1028 ? 320 : 340, 0));
-                BubblePlacement.layout(field);
-                revalidate();
+                int detailWidth = getWidth() <= 1028 ? COMPACT_DETAIL_WIDTH : DETAIL_WIDTH;
+                if (detail.getPreferredSize().width != detailWidth) {
+                    detail.setPreferredSize(new Dimension(detailWidth, 0));
+                    revalidate();
+                }
             }
         });
         field.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -210,8 +214,8 @@ public final class HomeScreen extends JPanel {
             edit.setIcon(penIcon());
             remove.setText("삭제");
             remove.setForeground(color("c5667c"));
-            edit.setFont(font(9, false));
-            remove.setFont(font(9, false));
+            edit.setFont(font(11, false));
+            remove.setFont(font(11, false));
             ownerActions.add(edit);
             ownerActions.add(remove);
             ownerActions.setPreferredSize(new Dimension(0, 35));
