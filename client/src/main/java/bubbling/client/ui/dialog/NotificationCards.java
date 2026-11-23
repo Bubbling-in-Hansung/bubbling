@@ -103,7 +103,7 @@ public final class NotificationCards {
 
         JButton close = closeButton("알림 닫기", () -> dismiss(current));
         close.setMargin(new Insets(0, 0, 0, 0));
-        close.setPreferredSize(new Dimension(26, 26));
+        close.setPreferredSize(new Dimension(34, 34));
         close.getAccessibleContext().setAccessibleName("알림 닫기");
         JPanel trailing = panel(new BorderLayout());
         trailing.add(close, BorderLayout.NORTH);

@@ -129,14 +129,16 @@ public final class Styles {
     }
 
     public static JButton closeButton(String tooltip, Runnable action) {
-        JButton close = button("×", false, action);
+        JButton close = button("", false, action);
         close.putClientProperty("flat", true);
         close.putClientProperty("soft", true);
         close.setBackground(color("f6f4f9"));
         close.setForeground(color("9e99aa"));
-        close.setFont(font(22, false));
+        close.setIcon(icon("close"));
+        close.setBorder(BorderFactory.createEmptyBorder());
         close.setPreferredSize(new Dimension(34, 34));
         close.setToolTipText(tooltip);
+        close.getAccessibleContext().setAccessibleName(tooltip);
         return close;
     }
 
@@ -253,7 +255,18 @@ public final class Styles {
                 g.translate(x, y);
                 g.setColor(PURPLE);
                 g.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                if (name.equals("home")) {
+                if (name.equals("close")) {
+                    g.setColor(c.getForeground());
+                    g.drawLine(5, 5, 17, 17);
+                    g.drawLine(17, 5, 5, 17);
+                } else if (name.equals("chevron-left")) {
+                    g.setStroke(new BasicStroke(2.4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                    Path2D chevron = new Path2D.Float();
+                    chevron.moveTo(14, 3);
+                    chevron.lineTo(6, 11);
+                    chevron.lineTo(14, 19);
+                    g.draw(chevron);
+                } else if (name.equals("home")) {
                     g.drawOval(2, 1, 9, 9);
                     g.drawOval(11, 11, 8, 8);
                     g.drawOval(1, 15, 4, 4);
