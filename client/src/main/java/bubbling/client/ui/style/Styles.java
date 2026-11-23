@@ -140,6 +140,27 @@ public final class Styles {
         return close;
     }
 
+    public static JButton reactionButton(Runnable action) {
+        JButton reaction = button("", false, action);
+        Icon heart = icon("heart");
+        reaction.setIcon(heart);
+        reaction.setDisabledIcon(heart);
+        reaction.setIconTextGap(3);
+        reaction.setMargin(new Insets(1, 5, 1, 5));
+        reaction.setFont(font(9, true));
+        reaction.putClientProperty("flat", true);
+        return reaction;
+    }
+
+    public static void updateReactionButton(JButton button, int count, boolean enabled) {
+        button.setEnabled(enabled);
+        button.setText(Integer.toString(count));
+        String countLabel = "공감 " + count + "개";
+        String label = enabled ? "공감하기 · " + countLabel : countLabel;
+        button.setToolTipText(label);
+        button.getAccessibleContext().setAccessibleName(label);
+    }
+
     public static JButton pending(String text) {
         JButton b = button(text, true, () -> {
         });
@@ -262,6 +283,16 @@ public final class Styles {
                     g.drawRoundRect(5, 10, 12, 10, 2, 2);
                     g.drawArc(8, 3, 6, 12, 0, 180);
                     g.fillOval(10, 13, 2, 3);
+                } else if (name.equals("heart")) {
+                    g.setColor(color(c.isEnabled() ? "c93d60" : "c98797"));
+                    Path2D heart = new Path2D.Float();
+                    heart.moveTo(11, 18);
+                    heart.curveTo(9, 16, 3, 12, 3, 8);
+                    heart.curveTo(3, 4, 8, 2, 11, 6);
+                    heart.curveTo(14, 2, 19, 4, 19, 8);
+                    heart.curveTo(19, 12, 13, 16, 11, 18);
+                    heart.closePath();
+                    g.fill(heart);
                 } else {
                     g.drawLine(5, 3, 5, 19);
                     g.drawLine(5, 3, 11, 3);

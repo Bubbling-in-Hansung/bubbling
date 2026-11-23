@@ -24,7 +24,7 @@ public final class ChatScreen extends JPanel {
     private final JPanel history = column(), speech = column();
     private final JTextField input = input("캐릭터에게 따뜻한 말을 건네보세요");
     private final ActivityIndicator activityIndicator = new ActivityIndicator();
-    private final JButton send, end, leave, edit;
+    private final JButton send, end, leave, edit, reaction;
     private JButton historyToggle;
     private JScrollPane log;
     private final javax.swing.Timer timer;
@@ -57,7 +57,16 @@ public final class ChatScreen extends JPanel {
         backSlot.add(backButton, backConstraints);
         header.add(backSlot, BorderLayout.WEST);
         JPanel titleBox = column();
-        append(titleBox, heading, 3);
+        reaction = reactionButton(() -> {
+            if (current != null) session.react(current);
+        });
+        JPanel titleRow = panel(null);
+        titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
+        titleRow.add(heading);
+        titleRow.add(Box.createHorizontalStrut(4));
+        titleRow.add(reaction);
+        titleRow.add(Box.createHorizontalGlue());
+        append(titleBox, titleRow, 3);
         append(titleBox, meta, 0);
         titleBox.setMinimumSize(new Dimension(0, titleBox.getPreferredSize().height));
         JPanel roomIdentity = panel(new GridBagLayout());
@@ -223,6 +232,7 @@ public final class ChatScreen extends JPanel {
         activityTimer = new javax.swing.Timer(1000, e -> {
             updateActivityIndicator();
             edit.setEnabled(canEditBubble());
+            refreshReaction();
         });
         addHierarchyListener(e -> {
             if (isShowing()) {
@@ -323,9 +333,17 @@ public final class ChatScreen extends JPanel {
         end.setEnabled(enabled && owner);
         edit.setVisible(owner);
         edit.setEnabled(canEditBubble());
+        refreshReaction();
         updateActivityIndicator();
         renderHistory();
         renderSpeech();
+    }
+
+    private void refreshReaction() {
+        reaction.setVisible(current != null);
+        if (current != null) {
+            updateReactionButton(reaction, current.reactionCount, session.canReact(current));
+        }
     }
 
     private void renderHistory() {

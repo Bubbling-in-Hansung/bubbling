@@ -16,7 +16,7 @@ public final class HomeScreen extends JPanel {
     private final Consumer<RoomView> enter;
     private final Runnable requestsOpened;
     private final JPanel detail = panel(new BorderLayout()), field = new JPanel(null);
-    private final RoomDetailPanel detailContent = new RoomDetailPanel(this::closeDetail);
+    private final RoomDetailPanel detailContent;
     private String category = "전체";
     private UiSession.Room selected;
     private boolean automatic;
@@ -30,6 +30,9 @@ public final class HomeScreen extends JPanel {
     public HomeScreen(UiData data, Consumer<RoomView> enter, Runnable requestsOpened) {
         super(new BorderLayout());
         session = data.session();
+        detailContent = new RoomDetailPanel(this::closeDetail, () -> {
+            if (selected != null) session.react(selected);
+        });
         this.enter = enter;
         this.requestsOpened = requestsOpened;
         setBackground(BG);
@@ -156,6 +159,7 @@ public final class HomeScreen extends JPanel {
         var r = selected;
         var request = session.outgoing(r);
         detailContent.updateRemaining(r.expiresAt, session.now());
+        detailContent.updateReaction(r.reactionCount, session.canReact(r));
         long remaining = session.retrySeconds(r);
         DetailState next = new DetailState(r.id, r.view, r.people, r.joined, r.ended, session.hidden(r), remaining,
                 request == null ? null : request.id, request == null ? null : request.status);

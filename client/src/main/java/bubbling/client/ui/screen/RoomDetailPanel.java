@@ -21,10 +21,11 @@ final class RoomDetailPanel extends JPanel {
     private final JLabel people = valueLabel();
     private final JLabel entry = valueLabel();
     private final WrappedTitle roomTitle = new WrappedTitle();
+    private final JButton reaction;
     private final JPanel actions = column();
     private final Orb orb = new Orb();
 
-    RoomDetailPanel(Runnable close) {
+    RoomDetailPanel(Runnable close, Runnable react) {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBackground(Color.WHITE);
         setBorder(BorderFactory.createEmptyBorder(24, 22, 24, 22));
@@ -50,7 +51,15 @@ final class RoomDetailPanel extends JPanel {
         tags.add(privacy);
         fixedHeight(tags, 25);
         append(this, tags, 16);
-        append(this, roomTitle, 18);
+        reaction = reactionButton(react);
+        JPanel titleRow = panel(null);
+        titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
+        titleRow.add(Box.createHorizontalGlue());
+        titleRow.add(roomTitle);
+        titleRow.add(Box.createHorizontalStrut(4));
+        titleRow.add(reaction);
+        titleRow.add(Box.createHorizontalGlue());
+        append(this, titleRow, 18);
         JPanel information = card(Color.WHITE, 28);
         information.setLayout(new GridLayout(4, 1));
         information.add(informationRow("대화 방식", mode, false));
@@ -89,6 +98,10 @@ final class RoomDetailPanel extends JPanel {
         if (!text.equals(remaining.getText())) {
             remaining.setText(text);
         }
+    }
+
+    void updateReaction(int count, boolean enabled) {
+        updateReactionButton(reaction, count, enabled);
     }
 
     void setActions(JPanel content) {
@@ -224,12 +237,17 @@ final class RoomDetailPanel extends JPanel {
 
         @Override
         public Dimension getPreferredSize() {
-            return new Dimension(0, lines().size() * LINE_HEIGHT);
+            return new Dimension(getFontMetrics(getFont()).stringWidth(text) + 10, lines().size() * LINE_HEIGHT);
+        }
+
+        @Override
+        public Dimension getMinimumSize() {
+            return new Dimension(0, getPreferredSize().height);
         }
 
         @Override
         public Dimension getMaximumSize() {
-            return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+            return getPreferredSize();
         }
 
         @Override

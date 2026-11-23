@@ -23,6 +23,7 @@ public final class UiSession {
         public final String bubbleId;
         public RoomView view;
         public int people;
+        public int reactionCount;
         public boolean joined;
         public boolean ended;
         public boolean removed;
@@ -97,6 +98,7 @@ public final class UiSession {
         if (!room.view.equals(view)) room.view = view;
         room.expiresAt = timestamp(bubble.expiresAt());
         room.people = bubble.currentMemberCnt();
+        room.reactionCount = Math.max(room.reactionCount, bubble.reactionCount());
         room.removed = bubble.status() != BubbleStatus.ALIVE;
         return room;
     }
@@ -161,6 +163,11 @@ public final class UiSession {
     public void updateMemberCount(String bubbleId, int count) {
         Room room = rooms.get(bubbleId);
         if (room != null) room.people = count;
+    }
+
+    public void updateReactionCount(String bubbleId, int count) {
+        Room room = rooms.get(bubbleId);
+        if (room != null) room.reactionCount = Math.max(room.reactionCount, count);
     }
 
     public boolean applyRequest(ChatRequestDto response) {
@@ -258,6 +265,15 @@ public final class UiSession {
 
     public boolean hidden(Room r) {
         return r.removed || r.ended || r.expiresAt != null && !r.expiresAt.isAfter(now()) || r.people >= r.view.capacity();
+    }
+
+    public boolean canReact(Room room) {
+        return !room.view.owner() && !room.removed
+                && (room.expiresAt == null || room.expiresAt.isAfter(now()));
+    }
+
+    public void react(Room room) {
+        if (canReact(room)) liveRequests.reactToBubble(room.bubbleId);
     }
 
     public List<Request> requests() {

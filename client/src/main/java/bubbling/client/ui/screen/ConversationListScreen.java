@@ -99,7 +99,16 @@ public final class ConversationListScreen extends JPanel {
             roomTitle.setToolTipText(notification);
             roomTitle.getAccessibleContext().setAccessibleDescription(notification);
         }
-        append(copy, roomTitle, 6);
+        JButton reaction = reactionButton(() -> session.react(r));
+        updateReactionButton(reaction, r.reactionCount, session.canReact(r));
+        JPanel titleRow = panel(null);
+        titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
+        roomTitle.setMinimumSize(new Dimension(0, roomTitle.getPreferredSize().height));
+        titleRow.add(roomTitle);
+        titleRow.add(Box.createHorizontalStrut(4));
+        titleRow.add(reaction);
+        titleRow.add(Box.createHorizontalGlue());
+        append(copy, titleRow, 6);
         append(copy, label((r.view.mode() == null ? "" : r.view.mode() + " · ") + r.people + " / " + r.view.capacity() + "명", 10, MUTED), 0);
         row.add(copy);
         JButton action = button(r.ended ? "기록 보기" : "대화로 이동", false,
