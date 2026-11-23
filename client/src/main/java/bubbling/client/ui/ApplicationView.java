@@ -20,6 +20,9 @@ import static bubbling.client.ui.style.Styles.*;
 
 /** Root owns screen transitions. Screens never depend on transport objects. */
 public final class ApplicationView extends JPanel {
+    private static final int HEADER_PADDING_Y = 6;
+    private static final int HEADER_HEIGHT = 62 + 2 * HEADER_PADDING_Y;
+    private static final int HEADER_ACCOUNT_RIGHT_PADDING = 36;
     private final CardLayout pages = new CardLayout();
     private final JPanel deck = new JPanel(pages);
     private final HomeScreen home;
@@ -78,8 +81,10 @@ public final class ApplicationView extends JPanel {
         JPanel header = panel(new BorderLayout());
         header.setOpaque(true);
         header.setBackground(Color.WHITE);
-        header.setPreferredSize(new Dimension(0, 62));
-        header.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, LINE));
+        header.setPreferredSize(new Dimension(0, HEADER_HEIGHT));
+        header.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0, LINE),
+                BorderFactory.createEmptyBorder(HEADER_PADDING_Y, 0, HEADER_PADDING_Y, 0)));
         JComponent brand = new JComponent() {
             protected void paintComponent(Graphics s) {
                 Graphics2D g = graphics(s);
@@ -111,11 +116,11 @@ public final class ApplicationView extends JPanel {
         categories.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
         categories.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         headerContent.add(categories, HOME);
-        headerContent.add(title("마이페이지    나의 프로필과 계정 정보를 확인해요", 14), PROFILE);
+        headerContent.add(title("마이페이지", 14), PROFILE);
         header.add(headerContent);
-        JPanel user = panel(new FlowLayout(FlowLayout.RIGHT, 9, 0));
-        user.setBorder(BorderFactory.createEmptyBorder(15, 0, 0, 23));
-        user.setPreferredSize(new Dimension(230, 62));
+        JPanel user = panel(new GridBagLayout());
+        user.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, HEADER_ACCOUNT_RIGHT_PADDING));
+        user.setPreferredSize(new Dimension(207 + HEADER_ACCOUNT_RIGHT_PADDING, 62));
         JComponent dot = new JComponent() {
             protected void paintComponent(Graphics source) {
                 var g = graphics(source);
@@ -127,23 +132,28 @@ public final class ApplicationView extends JPanel {
             }
         };
         dot.setPreferredSize(new Dimension(16, 16));
-        user.add(dot);
         JPanel account = column();
-        nickname = label("로그인 후 이용해주세요", 11, INK);
-        nickname.setFont(font(11, true));
+        nickname = title("로그인 후 이용해주세요", 14);
         nickname.setAlignmentX(Component.RIGHT_ALIGNMENT);
         account.add(nickname);
-        caption = label("", 8, color("9d98a7"));
+        caption = label("", 11, MUTED);
         caption.setAlignmentX(Component.RIGHT_ALIGNMENT);
         account.add(Box.createVerticalStrut(2));
         account.add(caption);
-        user.add(account);
+        JPanel userInfo = panel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        userInfo.add(dot);
+        userInfo.add(Box.createHorizontalStrut(9));
+        userInfo.add(account);
+        GridBagConstraints userConstraints = new GridBagConstraints();
+        userConstraints.weightx = 1;
+        userConstraints.anchor = GridBagConstraints.EAST;
+        user.add(userInfo, userConstraints);
         header.add(user, BorderLayout.EAST);
         header.addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentResized(java.awt.event.ComponentEvent e) {
                 boolean compact = header.getWidth() <= 1100;
                 brand.setPreferredSize(new Dimension(compact ? 180 : 206, 62));
-                user.setPreferredSize(new Dimension(compact ? 190 : 230, 62));
+                user.setPreferredSize(new Dimension((compact ? 167 : 207) + HEADER_ACCOUNT_RIGHT_PADDING, 62));
                 for (Component c : tabs.getComponents()) {
                     if (c instanceof JButton b) {
                         b.setBorder(BorderFactory.createEmptyBorder(8, compact ? 10 : 15, 8, compact ? 10 : 15));
@@ -398,7 +408,7 @@ public final class ApplicationView extends JPanel {
     }
 
     public void setOnline(int count) {
-        caption.setText("접속 " + count + "명");
+        caption.setText("현재 접속 " + count + "명");
     }
 
     public void openLiveChat(UiSession.Room room) {
