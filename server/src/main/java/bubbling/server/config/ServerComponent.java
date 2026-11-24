@@ -106,6 +106,12 @@ public class ServerComponent {
         );
 
         messageDispatcher.register(
+                MessageType.LOGOUT,
+                true,
+                handler::logout
+        );
+
+        messageDispatcher.register(
                 MessageType.PASSWORD_CHANGE_REQUEST,
                 true,
                 handler::changePassword
