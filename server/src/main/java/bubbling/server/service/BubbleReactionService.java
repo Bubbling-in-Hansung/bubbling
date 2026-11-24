@@ -15,16 +15,9 @@ public class BubbleReactionService {
         this.store = bubbleStore;
     }
 
-    private BubbleReaction create(
-            User user,
-            Bubble bubble
-    ) {
-        BubbleReaction bubbleReaction = BubbleReaction.create(
-                bubble,
-                user
-        );
+    private BubbleReaction create(User user, Bubble bubble) {
+        BubbleReaction bubbleReaction = BubbleReaction.create(bubble, user);
         store.save(bubbleReaction);
-
         return bubbleReaction;
     }
 
@@ -34,7 +27,7 @@ public class BubbleReactionService {
         if (bubbleReaction.isEmpty()) {
             create(user, bubble);
         } else {
-            bubbleReaction.get().increaseReactionCnt();
+            bubbleReaction.get().react();
         }
     }
 }
