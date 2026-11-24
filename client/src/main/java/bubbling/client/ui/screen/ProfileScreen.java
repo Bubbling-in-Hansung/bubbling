@@ -3,6 +3,7 @@ package bubbling.client.ui.screen;
 import bubbling.client.ui.model.*;
 import bubbling.client.ui.drawing.*;
 import bubbling.client.ui.dialog.CharacterPickerDialog;
+import bubbling.client.ui.dialog.PasswordChangeDialog;
 import bubbling.common.dto.user.UserDto;
 import bubbling.common.enums.ProfileCharacter;
 import javax.swing.*;
@@ -58,7 +59,12 @@ public final class ProfileScreen extends JPanel {
         spaceTitle = title("나의 공간", 24);
         append(copy, spaceTitle, 9);
         append(copy, label("나만의 캐릭터와 함께 마음을 나눠요", 12, MUTED), 16);
-        append(copy, button("캐릭터 변경", false, () -> characters()), 0);
+        JPanel actions = panel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        actions.add(button("캐릭터 변경", false, this::characters));
+        actions.add(Box.createHorizontalStrut(8));
+        actions.add(button("비밀번호 변경", false, this::changePassword));
+        actions.setMaximumSize(new Dimension(Integer.MAX_VALUE, actions.getPreferredSize().height));
+        append(copy, actions, 0);
         hero.add(copy);
         JPanel account = column();
         account.setPreferredSize(new Dimension(260, 140));
@@ -117,5 +123,10 @@ public final class ProfileScreen extends JPanel {
         Window owner = SwingUtilities.getWindowAncestor(this);
         new CharacterPickerDialog(owner, session.character(), signedIn,
                 value -> saveProfile.accept(CharacterChoice.at(value).profile())).setVisible(true);
+    }
+
+    private void changePassword() {
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        new PasswordChangeDialog(owner, signedIn, session).setVisible(true);
     }
 }

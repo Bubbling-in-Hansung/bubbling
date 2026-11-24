@@ -1,11 +1,6 @@
 package bubbling.client.ui.screen;
 
-import com.formdev.flatlaf.ui.FlatPasswordFieldUI;
-
 import javax.swing.*;
-import javax.swing.text.Element;
-import javax.swing.text.PasswordView;
-import javax.swing.text.View;
 import java.awt.*;
 import java.util.Arrays;
 import static bubbling.client.ui.style.Styles.*;
@@ -35,10 +30,10 @@ public final class AuthScreen extends JPanel {
         append(form, label(signup ? "계정 닉네임은 채팅방 랜덤 닉네임과 별개예요." : "당신을 기다리는 마음들이 있어요.", 12, MUTED), 20);
         if (signup) loginId.putClientProperty("JTextField.placeholderText", "아이디 8~32자 · 영문으로 시작");
         field(form, "아이디", loginId);
-        JPasswordField password = passwordField(signup ? "8~64자 · 영문, 숫자, 특수문자 포함" : "비밀번호를 입력해주세요");
+        JPasswordField password = passwordInput(signup ? "8~64자 · 영문, 숫자, 특수문자 포함" : "비밀번호를 입력해주세요");
         if (signup) password.setToolTipText("허용 특수문자: !@#$%^&*");
         field(form, "비밀번호", password);
-        JPasswordField confirmation = signup ? passwordField("비밀번호를 한 번 더 입력해주세요") : null;
+        JPasswordField confirmation = signup ? passwordInput("비밀번호를 한 번 더 입력해주세요") : null;
         JTextField nickname = input("사용할 닉네임을 입력해주세요");
         if (signup) {
             field(form, "비밀번호 확인", confirmation);
@@ -66,28 +61,6 @@ public final class AuthScreen extends JPanel {
         append(form, modeSwitch, 8);
         form.setPreferredSize(new Dimension(330, Math.max(signup ? 440 : 380, form.getPreferredSize().height)));
         card.add(form);
-    }
-
-    private static JPasswordField passwordField(String hint) {
-        JPasswordField password = new JPasswordField();
-        password.setUI(new FlatPasswordFieldUI() {
-            @Override
-            public View create(Element element) {
-                return new PasswordView(element) {
-                    @Override
-                    protected int drawEchoCharacter(Graphics graphics, int x, int y, char mask) {
-                        super.drawEchoCharacter(graphics, x, y, mask);
-                        // Use the same character advance as Swing's caret and selection.
-                        return x + password.getFontMetrics(password.getFont()).charWidth(mask);
-                    }
-                };
-            }
-        });
-        password.setFont(font(12, false));
-        password.setPreferredSize(new Dimension(200, 42));
-        password.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
-        password.putClientProperty("JTextField.placeholderText", hint);
-        return password;
     }
 
     private void submit(Submit action, JPasswordField password, JPasswordField confirmation, JTextField nickname) {

@@ -447,4 +447,8 @@ public final class UiSession {
     public void remove(Room r) {
         liveRequests.deleteBubble(r.bubbleId);
     }
+
+    public void changePassword(String currentPassword, String newPassword) {
+        liveRequests.changePassword(currentPassword, newPassword);
+    }
 }

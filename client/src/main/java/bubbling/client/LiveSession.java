@@ -86,6 +86,7 @@ public final class LiveSession {
             if (!authMatches(message)) return;
             signedIn(dispatcher.decode(message, RegisterResponse.class).user());
         });
+        onAuthenticated(dispatcher, PASSWORD_CHANGED, message -> view.passwordChanged());
         on(dispatcher, ERROR, message -> {
             ExceptionResponse response = dispatcher.decodeError(message);
             String detail = response.message() == null ? "서버에서 요청을 처리하지 못했습니다." : response.message();

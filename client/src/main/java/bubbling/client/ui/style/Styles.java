@@ -1,6 +1,11 @@
 package bubbling.client.ui.style;
 
+import com.formdev.flatlaf.ui.FlatPasswordFieldUI;
+
 import javax.swing.*;
+import javax.swing.text.Element;
+import javax.swing.text.PasswordView;
+import javax.swing.text.View;
 import java.awt.*;
 import java.awt.geom.Path2D;
 
@@ -332,6 +337,28 @@ public final class Styles {
         f.setPreferredSize(new Dimension(200, 42));
         f.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         return f;
+    }
+
+    public static JPasswordField passwordInput(String hint) {
+        JPasswordField password = new JPasswordField();
+        password.setUI(new FlatPasswordFieldUI() {
+            @Override
+            public View create(Element element) {
+                return new PasswordView(element) {
+                    @Override
+                    protected int drawEchoCharacter(Graphics graphics, int x, int y, char mask) {
+                        super.drawEchoCharacter(graphics, x, y, mask);
+                        // Use the same character advance as Swing's caret and selection.
+                        return x + password.getFontMetrics(password.getFont()).charWidth(mask);
+                    }
+                };
+            }
+        });
+        password.setFont(font(12, false));
+        password.setPreferredSize(new Dimension(200, 42));
+        password.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
+        password.putClientProperty("JTextField.placeholderText", hint);
+        return password;
     }
 
     public static JScrollPane scroll(JComponent c) {

@@ -2,6 +2,7 @@ package bubbling.client.service;
 
 import bubbling.client.ui.model.ConversationMode;
 import bubbling.client.ui.model.RoomView;
+import bubbling.common.dto.auth.PasswordChangeRequest;
 import bubbling.common.dto.bubble.BubbleCreateRequest;
 import bubbling.common.dto.bubble.BubbleDeleteRequest;
 import bubbling.common.dto.bubble.BubbleReactionRequest;
@@ -69,6 +70,10 @@ public final class SessionRequests {
 
     public void sendMessage(String roomId, String text) {
         send.accept(CHAT_MESSAGE, new ChatMessageRequest(roomId, text.strip()));
+    }
+
+    public void changePassword(String currentPassword, String newPassword) {
+        send.accept(PASSWORD_CHANGE_REQUEST, new PasswordChangeRequest(currentPassword, newPassword));
     }
 
     private static BubbleCategory category(RoomView room) {

@@ -408,6 +408,10 @@ public final class ApplicationView extends JPanel {
         repaint();
     }
 
+    public void passwordChanged() {
+        NotificationCards.info(this, "비밀번호 변경 완료", "비밀번호가 성공적으로 변경되었어요.");
+    }
+
     public void setOnline(int count) {
         caption.setText("현재 접속 " + count + "명");
     }
