@@ -54,10 +54,20 @@ public final class ConversationListScreen extends JPanel {
         heading.add(title("나의 대화", 22));
         JPanel tabs = panel(new FlowLayout(FlowLayout.RIGHT));
         for (Filter value : Filter.values()) {
-            tabs.add(button(value.label, false, () -> {
+            JButton tab = button(value.label, false, () -> {
                 filter = value;
                 refresh();
-            }));
+            });
+            tab.setSelected(value == filter);
+            tab.addActionListener(e -> {
+                for (Component component : tabs.getComponents()) {
+                    if (component instanceof JButton button) {
+                        button.setSelected(button == tab);
+                    }
+                }
+                tabs.repaint();
+            });
+            tabs.add(tab);
         }
         heading.add(tabs, BorderLayout.EAST);
         append(content, heading, 22);
