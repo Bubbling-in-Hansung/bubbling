@@ -16,11 +16,13 @@ import static bubbling.client.ui.style.Styles.*;
 
 /** Native image slices, centered text and local expansion; stored message text is untouched. */
 public final class MessageBubble extends JPanel {
-    public static final int MAX_WIDTH = 220;
+    public static final int MAX_WIDTH = 232;
     private static final int MIN_WIDTH = 96;
-    private static final int SIDE_PADDING = 12, VERTICAL_PADDING = 5;
-    private static final int SLICE_BASE_WIDTH = 474, TOP_SLICE_HEIGHT = 105, BODY_SLICE_HEIGHT = 100,
-            BOTTOM_SLICE_HEIGHT = 105, TAIL_SLICE_HEIGHT = 39;
+    private static final int SIDE_PADDING = 16, VERTICAL_PADDING = 10;
+    public static final int MAX_TEXT_WIDTH = MAX_WIDTH - SIDE_PADDING * 2;
+    private static final double MAX_CAP_SCALE = 0.28;
+    private static final int SLICE_BASE_WIDTH = 474, TOP_SLICE_HEIGHT = 70,
+            BOTTOM_SLICE_HEIGHT = 102, BOTTOM_BODY_SLICE_HEIGHT = 67;
     private static final Map<String, BufferedImage> IMAGES = new HashMap<>();
     private final boolean mine, historyStyle;
     private final BufferedImage topImage, bodyImage, bottomImage;
@@ -32,7 +34,7 @@ public final class MessageBubble extends JPanel {
     private final Runnable resized;
     private boolean expanded;
     private int availableHeight = 300;
-    private int topHeight, bottomHeight, tileHeight, bodyTiles, tailHeight, contentHeight, controlHeight;
+    private int topHeight, bottomHeight, centerHeight, tailHeight, contentHeight, controlHeight;
     public MessageBubble(String message, boolean mine, boolean historyStyle, Runnable resized) {
         this.mine = mine;
         this.historyStyle = historyStyle;
@@ -45,7 +47,7 @@ public final class MessageBubble extends JPanel {
         bottomImage = image(mine ? prefix + "bottom.png" : (historyStyle ? "w_l_bottom.png" : "w_c_bottom.png"));
         setFont(font(11, false));
         FontMetrics metrics = getFontMetrics(getFont());
-        fullLines = MessageText.lines(message, metrics::stringWidth, MAX_WIDTH - SIDE_PADDING * 2);
+        fullLines = MessageText.lines(message, metrics::stringWidth, MAX_TEXT_WIDTH);
         collapsedLines = fullLines.subList(0, Math.min(MessageText.MAX_LINES, fullLines.size()));
         expandable = fullLines.size() > MessageText.MAX_LINES || MessageText.characters(message).size() > MessageText.MAX_LENGTH;
         text = new CenteredText(message, collapsedLines);
@@ -123,7 +125,24 @@ public final class MessageBubble extends JPanel {
                     while (right > left && (original.getRGB(right, seam) >>> 24) <= 10) {
                         right--;
                     }
-                    result = original.getSubimage(left, 0, right - left + 1, original.getHeight());
+                    int top = 0, bottom = original.getHeight() - 1;
+                    int midX = (left + right) / 2;
+                    if (name.endsWith("_top.png")) {
+                        while (top < bottom && (original.getRGB(midX, top) >>> 24) <= 10) {
+                            top++;
+                        }
+                        int capEnd = top;
+                        while (capEnd < bottom && ((original.getRGB(left, capEnd) >>> 24) <= 10
+                                || (original.getRGB(right, capEnd) >>> 24) <= 10)) {
+                            capEnd++;
+                        }
+                        bottom = Math.min(original.getHeight() - 1, capEnd + 1);
+                    } else if (name.endsWith("_bottom.png")) {
+                        while (bottom > top && !hasOpaquePixel(original, left, right, bottom)) {
+                            bottom--;
+                        }
+                    }
+                    result = original.getSubimage(left, top, right - left + 1, bottom - top + 1);
                 }
             }
         } catch (IOException ignored) {
@@ -131,6 +150,15 @@ public final class MessageBubble extends JPanel {
         }
         IMAGES.put(name, result);
         return result;
+    }
+
+    private static boolean hasOpaquePixel(BufferedImage image, int left, int right, int y) {
+        for (int x = left; x <= right; x++) {
+            if ((image.getRGB(x, y) >>> 24) > 10) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void setExpanded(boolean value) {
@@ -159,24 +187,29 @@ public final class MessageBubble extends JPanel {
         int textWidth = lines.stream().mapToInt(metrics::stringWidth).max().orElse(0);
         int width = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.max(textWidth, expandable ? metrics.stringWidth(toggle.getText())
                 : 0) + SIDE_PADDING * 2));
-        // Each slice scales uniformly; extra body tiles change the overall aspect ratio.
-        double scale = (double) width / (topImage == null ? SLICE_BASE_WIDTH : topImage.getWidth());
-        topHeight = Math.max(1, (int) Math.round((topImage == null ? TOP_SLICE_HEIGHT : topImage.getHeight()) * scale));
-        bottomHeight = Math.max(1, (int) Math.round(width * (bottomImage == null
-                ? (double) BOTTOM_SLICE_HEIGHT / SLICE_BASE_WIDTH
-                : (double) bottomImage.getHeight() / bottomImage.getWidth())));
-        tileHeight = Math.max(1, (int) Math.round(width * (bodyImage == null
-                ? (double) BODY_SLICE_HEIGHT / SLICE_BASE_WIDTH
-                : (double) bodyImage.getHeight() / bodyImage.getWidth())));
-        tailHeight = Math.max(1, (int) Math.ceil(bottomHeight * (double) TAIL_SLICE_HEIGHT / BOTTOM_SLICE_HEIGHT));
         int naturalTextHeight = lines.size() * metrics.getHeight();
-        int fixedHeight = topHeight + bottomHeight;
-        int textBudget = Math.max(metrics.getHeight(), availableHeight - fixedHeight - controlHeight * 2 - VERTICAL_PADDING * 2 - tileHeight);
+        int topSourceWidth = topImage == null ? SLICE_BASE_WIDTH : topImage.getWidth();
+        int topSourceHeight = topImage == null ? TOP_SLICE_HEIGHT : topImage.getHeight();
+        int bottomSourceHeight = bottomImage == null ? BOTTOM_SLICE_HEIGHT : bottomImage.getHeight();
+        int bottomBodySourceHeight = Math.min(BOTTOM_BODY_SLICE_HEIGHT, bottomSourceHeight);
+        int tailSourceHeight = Math.max(1, bottomSourceHeight - bottomBodySourceHeight);
+
+        double widthScale = (double) width / topSourceWidth;
+        int estimatedTailHeight = Math.max(1, (int) Math.ceil(tailSourceHeight * Math.min(widthScale, MAX_CAP_SCALE)));
+        int textBudget = Math.max(metrics.getHeight(),
+                availableHeight - estimatedTailHeight - controlHeight * 2 - VERTICAL_PADDING * 2);
         contentHeight = expanded ? Math.min(naturalTextHeight, textBudget) : naturalTextHeight;
         // Leave matching space above the text so the control does not shift its body center.
-        int required = contentHeight + controlHeight * 2 + VERTICAL_PADDING * 2;
-        bodyTiles = Math.max(0, (int) Math.ceil((required - (fixedHeight - tailHeight)) / (double) tileHeight));
-        int height = fixedHeight + bodyTiles * tileHeight;
+        int bodyHeight = contentHeight + controlHeight * 2 + VERTICAL_PADDING * 2;
+
+        double capScale = Math.min(Math.min(widthScale, MAX_CAP_SCALE),
+                (double) bodyHeight / (topSourceHeight + bottomBodySourceHeight));
+        topHeight = Math.max(1, (int) Math.round(topSourceHeight * capScale));
+        int bottomBodyHeight = Math.max(1, (int) Math.round(bottomBodySourceHeight * capScale));
+        tailHeight = Math.max(1, (int) Math.ceil(tailSourceHeight * capScale));
+        bottomHeight = bottomBodyHeight + tailHeight;
+        centerHeight = Math.max(0, bodyHeight - topHeight - bottomBodyHeight);
+        int height = topHeight + centerHeight + bottomHeight;
         text.showLines(lines, width - SIDE_PADDING * 2);
         text.setToolTipText(expanded && contentHeight < naturalTextHeight ? "마우스 휠로 원문을 확인할 수 있어요." : null);
         Dimension size = new Dimension(width, height);
@@ -203,10 +236,10 @@ public final class MessageBubble extends JPanel {
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         if (topImage != null && bodyImage != null && bottomImage != null) {
             g.drawImage(topImage, 0, 0, getWidth(), topHeight, null);
-            for (int i = 0; i < bodyTiles; i++) {
-                g.drawImage(bodyImage, 0, topHeight + i * tileHeight, getWidth(), tileHeight, null);
+            if (centerHeight > 0) {
+                g.drawImage(bodyImage, 0, topHeight, getWidth(), centerHeight, null);
             }
-            g.drawImage(bottomImage, 0, topHeight + bodyTiles * tileHeight, getWidth(), bottomHeight, null);
+            g.drawImage(bottomImage, 0, topHeight + centerHeight, getWidth(), bottomHeight, null);
         } else {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setColor(mine ? PURPLE : (historyStyle ? SOFT : Color.WHITE));

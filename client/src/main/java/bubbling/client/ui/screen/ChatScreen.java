@@ -328,7 +328,7 @@ public final class ChatScreen extends JPanel {
             return;
         }
         if (!MessageText.acceptsInput(input.getText()) || MessageText.lines(input.getText(), input.getFontMetrics(font(11,
-                false))::stringWidth, MessageBubble.MAX_WIDTH - 24).size() > MessageText.MAX_LINES) {
+                false))::stringWidth, MessageBubble.MAX_TEXT_WIDTH).size() > MessageText.MAX_LINES) {
             NotificationCards.info(this, "메시지 입력 안내",
                     "메시지는 공백 포함 " + MessageText.MAX_LENGTH + "자, 최대 " + MessageText.MAX_LINES
                     + "줄까지 입력할 수 있어요.");
