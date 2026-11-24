@@ -7,6 +7,7 @@ import bubbling.server.exception.code.ChatRequestExceptionCode;
 import bubbling.server.exception.code.ChatRoomExceptionCode;
 import bubbling.server.store.ChatRequestStore;
 
+import java.util.Comparator;
 import java.util.List;
 
 public class ChatRequestService {
@@ -82,5 +83,13 @@ public class ChatRequestService {
                 .map(ChatRequest::getId)
                 .toList();
         store.deleteAll(ids);
+    }
+
+    public List<ChatRequest> findAllByBubbleOwner(User user) {
+        return store.findAll().stream()
+                .filter(cr -> cr.getBubble().getOwner().equals(user))
+                .filter(cr -> cr.getStatus() == ChatRequestStatus.PENDING)
+                .sorted(Comparator.comparing(ChatRequest::getCreatedAt))
+                .toList();
     }
 }

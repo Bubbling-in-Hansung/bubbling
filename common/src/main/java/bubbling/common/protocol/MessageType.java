@@ -14,6 +14,8 @@ public enum MessageType {
     LOGIN_RESULT,
     PASSWORD_CHANGE_REQUEST,
     PASSWORD_CHANGED,
+    LOGOUT,
+    LOGOUT_RESULT,
 
     // 사용자
     USER_INFO_REQUEST,
@@ -45,6 +47,10 @@ public enum MessageType {
     CHAT_ACCEPTED,
     CHAT_REJECT,
     CHAT_REJECTED,
+
+    // 상담 요청 목록
+    CHAT_REQUEST_LIST_REQUEST,
+    CHAT_REQUEST_LIST,
 
     // 채팅방
     CHAT_STARTED,

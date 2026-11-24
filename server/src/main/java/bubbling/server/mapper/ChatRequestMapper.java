@@ -12,10 +12,10 @@ public class ChatRequestMapper {
 
     public static ChatRequestDto toDto(
             ChatRequest chatRequest,
-            User user
+            User user // message receiver
     ) {
-        boolean isOwner = chatRequest.getBubble().getOwner().getId().equals(user.getId());
-        boolean isRequester = chatRequest.getRequester().getId().equals(user.getId());
+        boolean isOwner = chatRequest.getBubble().getOwner().equals(user);
+        boolean isRequester = chatRequest.getRequester().equals(user);
 
         if (!isOwner && !isRequester) {
             throw new BaseException(ChatRequestExceptionCode.FORBIDDEN);

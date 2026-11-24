@@ -8,6 +8,7 @@ import bubbling.server.network.MessageSender;
 import bubbling.server.notifier.OnlineStatusNotifier;
 import bubbling.server.scheduler.BubbleExpirationScheduler;
 import bubbling.server.security.PasswordService;
+import bubbling.server.seed.SeedBootstrap;
 import bubbling.server.service.*;
 import bubbling.server.store.*;
 
@@ -58,6 +59,7 @@ public class ServerComponent {
 
         this.bubbleExpirationScheduler = new BubbleExpirationScheduler(bubbleService, messageSender);
 
+        loadSeedData();
         registerNotifiers();
         registerHandlers();
         startSchedulers();
@@ -103,6 +105,12 @@ public class ServerComponent {
                 MessageType.LOGIN,
                 false,
                 handler::login
+        );
+
+        messageDispatcher.register(
+                MessageType.LOGOUT,
+                true,
+                handler::logout
         );
 
         messageDispatcher.register(
@@ -228,6 +236,12 @@ public class ServerComponent {
                 true,
                 handler::reject
         );
+
+        messageDispatcher.register(
+                MessageType.CHAT_REQUEST_LIST_REQUEST,
+                true,
+                handler::list
+        );
     }
 
     private void registerChatMessageHandlers() {
@@ -281,5 +295,16 @@ public class ServerComponent {
 
     public void stopSchedulers() {
         bubbleExpirationScheduler.stop();
+    }
+
+    private void loadSeedData() {
+        new SeedBootstrap().load(
+                userService,
+                bubbleService,
+                chatRoomService,
+                chatMemberService,
+                chatRequestService,
+                chatMessageService
+        );
     }
 }

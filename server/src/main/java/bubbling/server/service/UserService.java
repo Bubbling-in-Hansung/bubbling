@@ -26,7 +26,7 @@ public class UserService {
                 loginId,
                 passwordHash,
                 nickname,
-                ProfileCharacter.EXAMPLE
+                ProfileCharacter.BUNNY
         );
 
         return store.save(user);
