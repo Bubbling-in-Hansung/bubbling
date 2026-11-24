@@ -4,6 +4,9 @@ import bubbling.client.ui.model.*;
 import bubbling.client.ui.dialog.UiErrors;
 import javax.swing.*;
 import java.awt.*;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import static bubbling.client.ui.style.Styles.*;
@@ -32,8 +35,10 @@ public final class ConversationListScreen extends JPanel {
     private final Consumer<RoomView> enter;
     private final Function<UiSession.Room, String> notificationDescription;
     private final JPanel rows = column();
+    private final JPanel tabs = panel(new FlowLayout(FlowLayout.RIGHT));
+    private final Map<Filter, JButton> filterButtons = new EnumMap<>(Filter.class);
     private final javax.swing.Timer expiryTimer;
-    private Filter filter = Filter.ALL;
+    private Filter filter = Filter.ACTIVE;
     private String expirySignature = "";
     private enum Filter {
         ALL("전체"), ACTIVE("진행 중"), EXPIRED("만료됨"), ENDED("종료됨");
@@ -62,21 +67,10 @@ public final class ConversationListScreen extends JPanel {
         pad(content, 32);
         JPanel heading = panel(new BorderLayout());
         heading.add(title("나의 대화", 22));
-        JPanel tabs = panel(new FlowLayout(FlowLayout.RIGHT));
         for (Filter value : Filter.values()) {
-            JButton tab = button(value.label, false, () -> {
-                filter = value;
-                refresh();
-            });
+            JButton tab = button(value.label, false, () -> selectFilter(value));
             tab.setSelected(value == filter);
-            tab.addActionListener(e -> {
-                for (Component component : tabs.getComponents()) {
-                    if (component instanceof JButton button) {
-                        button.setSelected(button == tab);
-                    }
-                }
-                tabs.repaint();
-            });
+            filterButtons.put(value, tab);
             tabs.add(tab);
         }
         heading.add(tabs, BorderLayout.EAST);
@@ -99,16 +93,25 @@ public final class ConversationListScreen extends JPanel {
         refresh();
     }
 
+    public void onEnter() {
+        selectFilter(Filter.ACTIVE);
+    }
+
+    private void selectFilter(Filter next) {
+        filter = next;
+        filterButtons.forEach((key, button) -> button.setSelected(key == next));
+        tabs.repaint();
+        refresh();
+    }
+
     public void refresh() {
         expirySignature = expiryKey();
         rows.removeAll();
-        for (var r : session.rooms()) {
-            if (!r.listed && !r.visited) {
-                continue;
-            }
-            if (!filter.includes(r, session)) {
-                continue;
-            }
+        var visibleRooms = session.rooms().stream()
+                .filter(r -> (r.listed || r.visited) && filter.includes(r, session))
+                .sorted(Comparator.comparing((UiSession.Room r) -> !r.view.owner()))
+                .toList();
+        for (var r : visibleRooms) {
             append(rows, createRow(r), 10);
         }
         if (rows.getComponentCount() == 0) {

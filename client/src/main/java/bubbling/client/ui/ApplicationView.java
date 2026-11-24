@@ -269,7 +269,7 @@ public final class ApplicationView extends JPanel {
         if (page.equals(CONVERSATIONS)) {
             unreadApprovals = 0;
             updateChatBadge();
-            conversations.refresh();
+            conversations.onEnter();
         }
         if (UiPages.usesShell(page)) {
             pages.show(deck, "shell");
