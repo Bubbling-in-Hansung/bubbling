@@ -9,6 +9,8 @@ import java.util.function.Function;
 import static bubbling.client.ui.style.Styles.*;
 
 public final class ConversationListScreen extends JPanel {
+    private static final int MIN_ROW_HEIGHT = 128;
+    private static final int ROW_EXTRA_HEIGHT = 6;
     private static final Icon NOTIFICATION_BADGE = new Icon() {
         public int getIconWidth() { return 16; }
         public int getIconHeight() { return 16; }
@@ -99,7 +101,16 @@ public final class ConversationListScreen extends JPanel {
         row.setLayout(new BorderLayout(16, 0));
         pad(row, 18);
         JPanel copy = column();
-        append(copy, label((r.ended ? "종료됨" : "진행 중") + (r.view.category() == null ? "" : " · " + r.view.category()), 11, PURPLE), 6);
+        JPanel statusRow = panel(null);
+        statusRow.setLayout(new BoxLayout(statusRow, BoxLayout.X_AXIS));
+        if (r.view.owner()) {
+            statusRow.add(ownerBadge());
+            statusRow.add(Box.createHorizontalStrut(6));
+        }
+        statusRow.add(label((r.ended ? "종료됨" : "진행 중")
+                + (r.view.category() == null ? "" : " · " + r.view.category()), 11, PURPLE));
+        statusRow.add(Box.createHorizontalGlue());
+        append(copy, statusRow, 6);
         JLabel roomTitle = title(r.view.title(), 15);
         roomTitle.setToolTipText(r.view.title());
         String notification = notificationDescription.apply(r);
@@ -127,7 +138,26 @@ public final class ConversationListScreen extends JPanel {
                 () -> UiErrors.perform(this, () -> enter.accept(r.view)));
         action.setEnabled(session.canOpen(r));
         row.add(action, BorderLayout.EAST);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 110));
+        int rowHeight = Math.max(MIN_ROW_HEIGHT, row.getPreferredSize().height + ROW_EXTRA_HEIGHT);
+        row.setPreferredSize(new Dimension(0, rowHeight));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowHeight));
         return row;
+    }
+
+    private static JLabel ownerBadge() {
+        JLabel badge = new JLabel("내 비눗방울", SwingConstants.CENTER) {
+            @Override
+            protected void paintComponent(Graphics source) {
+                Graphics2D g = graphics(source);
+                g.setColor(PURPLE);
+                g.fillRoundRect(0, 0, getWidth(), getHeight(), 12, 12);
+                g.dispose();
+                super.paintComponent(source);
+            }
+        };
+        badge.setFont(font(9, true));
+        badge.setForeground(Color.WHITE);
+        badge.setBorder(BorderFactory.createEmptyBorder(2, 7, 2, 7));
+        return badge;
     }
 }
