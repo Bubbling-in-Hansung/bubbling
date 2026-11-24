@@ -308,6 +308,11 @@ public final class UiSession {
                 .orElse(null);
     }
 
+    public boolean expired(Room r) {
+        return !r.ended && (r.view.expired() || r.removed
+                || r.expiresAt != null && !r.expiresAt.isAfter(now()));
+    }
+
     public boolean hidden(Room r) {
         return r.removed || r.ended || r.expiresAt != null && !r.expiresAt.isAfter(now()) || r.people >= r.view.capacity();
     }

@@ -11,6 +11,7 @@ import static bubbling.client.ui.style.Styles.*;
 public final class ConversationListScreen extends JPanel {
     private static final int MIN_ROW_HEIGHT = 128;
     private static final int ROW_EXTRA_HEIGHT = 6;
+    private static final int EXPIRY_CHECK_MS = 1000;
     private static final Icon NOTIFICATION_BADGE = new Icon() {
         public int getIconWidth() { return 16; }
         public int getIconHeight() { return 16; }
@@ -31,15 +32,22 @@ public final class ConversationListScreen extends JPanel {
     private final Consumer<RoomView> enter;
     private final Function<UiSession.Room, String> notificationDescription;
     private final JPanel rows = column();
+    private final javax.swing.Timer expiryTimer;
     private Filter filter = Filter.ALL;
+    private String expirySignature = "";
     private enum Filter {
-        ALL("전체"), ACTIVE("진행 중"), ENDED("종료됨");
+        ALL("전체"), ACTIVE("진행 중"), EXPIRED("만료됨"), ENDED("종료됨");
         private final String label;
         Filter(String label) {
             this.label = label;
         }
-        boolean includes(UiSession.Room room) {
-            return this == ALL || this == ENDED && room.ended || this == ACTIVE && !room.ended;
+        boolean includes(UiSession.Room room, UiSession session) {
+            return switch (this) {
+                case ALL -> true;
+                case ACTIVE -> !room.ended && !session.expired(room);
+                case EXPIRED -> session.expired(room);
+                case ENDED -> room.ended;
+            };
         }
     }
 
@@ -75,16 +83,30 @@ public final class ConversationListScreen extends JPanel {
         append(content, heading, 22);
         append(content, rows, 0);
         add(scroll(content));
+        expiryTimer = new javax.swing.Timer(EXPIRY_CHECK_MS, e -> {
+            if (!expiryKey().equals(expirySignature)) {
+                refresh();
+            }
+        });
+        addHierarchyListener(e -> {
+            if (isShowing()) {
+                refresh();
+                expiryTimer.start();
+            } else {
+                expiryTimer.stop();
+            }
+        });
         refresh();
     }
 
     public void refresh() {
+        expirySignature = expiryKey();
         rows.removeAll();
         for (var r : session.rooms()) {
             if (!r.listed && !r.visited) {
                 continue;
             }
-            if (!filter.includes(r)) {
+            if (!filter.includes(r, session)) {
                 continue;
             }
             append(rows, createRow(r), 10);
@@ -94,6 +116,14 @@ public final class ConversationListScreen extends JPanel {
         }
         rows.revalidate();
         rows.repaint();
+    }
+
+    private String expiryKey() {
+        return session.rooms().stream()
+                .filter(r -> r.listed || r.visited)
+                .map(r -> r.id + ":" + r.ended + ":" + session.expired(r))
+                .toList()
+                .toString();
     }
 
     private JPanel createRow(UiSession.Room r) {
@@ -107,7 +137,8 @@ public final class ConversationListScreen extends JPanel {
             statusRow.add(ownerBadge());
             statusRow.add(Box.createHorizontalStrut(6));
         }
-        statusRow.add(label((r.ended ? "종료됨" : "진행 중")
+        String statusText = r.ended ? "종료됨" : session.expired(r) ? "만료됨" : "진행 중";
+        statusRow.add(label(statusText
                 + (r.view.category() == null ? "" : " · " + r.view.category()), 11, PURPLE));
         statusRow.add(Box.createHorizontalGlue());
         append(copy, statusRow, 6);
@@ -159,5 +190,11 @@ public final class ConversationListScreen extends JPanel {
         badge.setForeground(Color.WHITE);
         badge.setBorder(BorderFactory.createEmptyBorder(2, 7, 2, 7));
         return badge;
+    }
+
+    @Override
+    public void removeNotify() {
+        expiryTimer.stop();
+        super.removeNotify();
     }
 }
