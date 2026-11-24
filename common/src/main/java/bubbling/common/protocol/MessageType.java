@@ -46,6 +46,10 @@ public enum MessageType {
     CHAT_REJECT,
     CHAT_REJECTED,
 
+    // 상담 요청 목록
+    CHAT_REQUEST_LIST_REQUEST,
+    CHAT_REQUEST_LIST,
+
     // 채팅방
     CHAT_STARTED,
     CHAT_JOIN,

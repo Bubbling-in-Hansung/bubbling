@@ -58,6 +58,7 @@ public class ChatRequest {
     public void cancel() {
         validatePending();
         this.status = ChatRequestStatus.CANCELLED;
+        this.respondedAt = LocalDateTime.now();
     }
 
     private void validatePending() {

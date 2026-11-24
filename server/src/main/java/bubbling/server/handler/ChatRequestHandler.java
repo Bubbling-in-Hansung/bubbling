@@ -162,4 +162,19 @@ public class ChatRequestHandler {
         );
         messageSender.sendTarget(chatRequest.getRequester(), event);
     }
+
+    public void list(ClientConnection connection, MessageEnvelope message) {
+        User user = connection.requireAuthenticatedUser();
+
+        List<ChatRequestDto> dtos = chatRequestService.findAllByBubbleOwner(user)
+                .stream()
+                .map(cr -> ChatRequestMapper.toDto(cr, user)).toList();
+
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.CHAT_REQUEST_LIST,
+                message.requestId(),
+                jsonCodec.toPayload(dtos)
+        );
+        messageSender.send(connection, response);
+    }
 }

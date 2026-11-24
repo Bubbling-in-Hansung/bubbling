@@ -228,6 +228,12 @@ public class ServerComponent {
                 true,
                 handler::reject
         );
+
+        messageDispatcher.register(
+                MessageType.CHAT_REQUEST_LIST_REQUEST,
+                true,
+                handler::list
+        );
     }
 
     private void registerChatMessageHandlers() {
