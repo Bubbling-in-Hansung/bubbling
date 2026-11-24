@@ -23,7 +23,7 @@ public final class BubbleMotion {
             button = b;
             p = position(b);
             v = (double[]) b.getClientProperty("velocity");
-            radius = ((UiSession.Room) b.getClientProperty("room")).view.size() / 2.0;
+            radius = ((UiSession.Room) b.getClientProperty("room")).bubbleDiameter() / 2.0;
             offset = BubbleGeometry.SHADOW_PADDING + radius;
             speed = Math.hypot(v[0], v[1]);
             fixed = b.getModel().isRollover() || b.getModel().isPressed();

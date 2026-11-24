@@ -11,12 +11,14 @@ import static bubbling.client.ui.style.Styles.*;
 
 public final class HomeScreen extends JPanel {
     private static final double MOTION_SPEED_MULTIPLIER = 10.0;
+    private static final int DETAIL_WIDTH = 408;
+    private static final int COMPACT_DETAIL_WIDTH = 384;
     private final java.util.Map<String, JButton> bubbleButtons = new java.util.LinkedHashMap<>();
     private final UiSession session;
     private final Consumer<RoomView> enter;
     private final Runnable requestsOpened;
     private final JPanel detail = panel(new BorderLayout()), field = new JPanel(null);
-    private final RoomDetailPanel detailContent = new RoomDetailPanel(this::closeDetail);
+    private final RoomDetailPanel detailContent;
     private String category = "전체";
     private UiSession.Room selected;
     private boolean automatic;
@@ -30,6 +32,9 @@ public final class HomeScreen extends JPanel {
     public HomeScreen(UiData data, Consumer<RoomView> enter, Runnable requestsOpened) {
         super(new BorderLayout());
         session = data.session();
+        detailContent = new RoomDetailPanel(this::closeDetail, () -> {
+            if (selected != null) session.react(selected);
+        });
         this.enter = enter;
         this.requestsOpened = requestsOpened;
         setBackground(BG);
@@ -37,7 +42,7 @@ public final class HomeScreen extends JPanel {
                 () -> new RoomEditor(SwingUtilities.getWindowAncestor(this), null,
                 session, this::refresh).setVisible(true));
         add(center);
-        detail.setPreferredSize(new Dimension(340, 0));
+        detail.setPreferredSize(new Dimension(DETAIL_WIDTH, 0));
         detail.setOpaque(true);
         detail.setBackground(Color.WHITE);
         detail.setBorder(BorderFactory.createMatteBorder(0, 1, 0, 0, LINE));
@@ -59,9 +64,11 @@ public final class HomeScreen extends JPanel {
         });
         addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentResized(java.awt.event.ComponentEvent e) {
-                detail.setPreferredSize(new Dimension(getWidth() <= 1028 ? 320 : 340, 0));
-                BubblePlacement.layout(field);
-                revalidate();
+                int detailWidth = getWidth() <= 1028 ? COMPACT_DETAIL_WIDTH : DETAIL_WIDTH;
+                if (detail.getPreferredSize().width != detailWidth) {
+                    detail.setPreferredSize(new Dimension(detailWidth, 0));
+                    revalidate();
+                }
             }
         });
         field.addComponentListener(new java.awt.event.ComponentAdapter() {
@@ -91,7 +98,9 @@ public final class HomeScreen extends JPanel {
 
     public void refresh() {
         var rooms = session.rooms();
-        String key = category + rooms.stream().map(r -> r.id + ":" + r.people + ":" + session.hidden(r) + ":" + r.view).toList();
+        String key = category + rooms.stream()
+                .map(r -> r.id + ":" + r.people + ":" + session.hidden(r) + ":" + r.bubbleDiameter() + ":" + r.view)
+                .toList();
         if (!key.equals(signature)) {
             signature = key;
             java.util.Set<String> visible = new java.util.HashSet<>();
@@ -156,6 +165,7 @@ public final class HomeScreen extends JPanel {
         var r = selected;
         var request = session.outgoing(r);
         detailContent.updateRemaining(r.expiresAt, session.now());
+        detailContent.updateReaction(r.reactionCount, session.canReact(r));
         long remaining = session.retrySeconds(r);
         DetailState next = new DetailState(r.id, r.view, r.people, r.joined, r.ended, session.hidden(r), remaining,
                 request == null ? null : request.id, request == null ? null : request.status);
@@ -204,8 +214,8 @@ public final class HomeScreen extends JPanel {
             edit.setIcon(penIcon());
             remove.setText("삭제");
             remove.setForeground(color("c5667c"));
-            edit.setFont(font(9, false));
-            remove.setFont(font(9, false));
+            edit.setFont(font(11, false));
+            remove.setFont(font(11, false));
             ownerActions.add(edit);
             ownerActions.add(remove);
             ownerActions.setPreferredSize(new Dimension(0, 35));

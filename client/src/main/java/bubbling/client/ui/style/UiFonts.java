@@ -4,6 +4,7 @@ import java.awt.Font;
 import java.io.*;
 
 public final class UiFonts {
+    private static final float UI_SCALE = 1.2f;
     private static final Font REGULAR = load("/fonts/Noto_Sans_KR/static/NotoSansKR-Regular.ttf", false);
     private static final Font MEDIUM = load("/fonts/Noto_Sans_KR/static/NotoSansKR-Medium.ttf", false);
     private static final Font SEMIBOLD = load("/fonts/Noto_Sans_KR/static/NotoSansKR-SemiBold.ttf", true);
@@ -29,12 +30,20 @@ public final class UiFonts {
     }
 
     public static Font body(int size, int weight) {
+        return bodyAtSize(size * UI_SCALE, weight);
+    }
+
+    public static Font bodyAtSize(float size, int weight) {
         Font face = weight >= 700 ? BOLD : weight >= 600 ? SEMIBOLD : weight >= 500 ? MEDIUM : REGULAR;
         // The file supplies the actual outlines for this weight; only the point size changes.
-        return face.deriveFont((float) size);
+        return face.deriveFont((float) Math.round(size));
     }
 
     public static Font logo(int size) {
-        return LOGO.deriveFont((float) size);
+        return LOGO.deriveFont((float) Math.round(size * UI_SCALE));
+    }
+
+    public static Font scale(Font font) {
+        return font.deriveFont((float) Math.round(font.getSize2D() * UI_SCALE));
     }
 }

@@ -10,6 +10,7 @@ import bubbling.common.dto.auth.LoginResponse;
 import bubbling.common.dto.auth.RegisterRequest;
 import bubbling.common.dto.auth.RegisterResponse;
 import bubbling.common.dto.bubble.BubbleDto;
+import bubbling.common.dto.bubble.BubbleReactionEvent;
 import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.chat.ChatEndResponse;
 import bubbling.common.dto.chat.ChatHistoryRequest;
@@ -108,6 +109,12 @@ public final class LiveSession {
             state.applyBubble(decode(message, BubbleDto.class));
             view.refreshLiveState();
             refreshRooms();
+        });
+        on(dispatcher, BUBBLE_REACTED, message -> {
+            if (user == null) return;
+            BubbleReactionEvent reaction = decode(message, BubbleReactionEvent.class);
+            state.updateReactionCount(reaction.bubbleId(), reaction.reactionCount());
+            view.refreshLiveState();
         });
         on(dispatcher, BUBBLE_REMOVED, message -> {
             if (user == null) return;

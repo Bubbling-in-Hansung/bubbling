@@ -6,6 +6,7 @@ import bubbling.client.ui.dialog.RoomEditor;
 import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.drawing.MessageBubble;
 import bubbling.client.ui.model.*;
+import bubbling.client.ui.style.UiFonts;
 import bubbling.common.dto.chat.ChatParticipantDto;
 import javax.swing.*;
 import javax.swing.text.*;
@@ -20,11 +21,11 @@ import static bubbling.client.ui.style.Styles.*;
 
 public final class ChatScreen extends JPanel {
     private final UiSession session;
-    private final JLabel heading = title("대화 공간", 13), meta = label("", 9, color("918a9d"));
+    private final JLabel heading = title("대화 공간", 16), meta = label("", 11, MUTED);
     private final JPanel history = column(), speech = column();
     private final JTextField input = input("캐릭터에게 따뜻한 말을 건네보세요");
     private final ActivityIndicator activityIndicator = new ActivityIndicator();
-    private final JButton send, end, leave, edit;
+    private final JButton send, end, leave, edit, reaction;
     private JButton historyToggle;
     private JScrollPane log;
     private final javax.swing.Timer timer;
@@ -35,8 +36,8 @@ public final class ChatScreen extends JPanel {
     private int historyCount;
     private int historyRevision;
     private boolean historyInitialized;
-    private final JLabel historyHeading = title("", 12), historySubtitle = label("새 메시지가 실시간으로 표시돼요", 8, color("918a9d")),
-            emptyHistory = label("아직 대화 기록이 없어요.", 10, MUTED);
+    private final JLabel historyHeading = title("", 14), historySubtitle = label("새 메시지가 실시간으로 표시돼요", 11, MUTED),
+            emptyHistory = label("아직 대화 기록이 없어요.", 12, MUTED);
     private List<List<UiSession.Message>> visibleSpeech;
     private final java.util.Map<UiSession.Message, MessageBubble> speechBubbles = new java.util.IdentityHashMap<>();
     private static final DateTimeFormatter MESSAGE_TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault());
@@ -49,30 +50,46 @@ public final class ChatScreen extends JPanel {
         header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, color("d8d5df")),
                 BorderFactory.createEmptyBorder(12, 18, 4, 18)));
         header.setPreferredSize(new Dimension(0, 70));
-        JButton backButton = button("‹ 홈으로", false, back);
+        JButton backButton = button("홈으로", false, back);
+        backButton.setIcon(icon("chevron-left"));
+        backButton.setFont(font(13, true));
         backButton.putClientProperty("flat", true);
         JPanel backSlot = panel(new GridBagLayout());
         GridBagConstraints backConstraints = new GridBagConstraints();
         backConstraints.anchor = GridBagConstraints.WEST;
         backSlot.add(backButton, backConstraints);
         header.add(backSlot, BorderLayout.WEST);
-        JPanel titleBox = column();
-        append(titleBox, heading, 3);
+        JPanel titleBox = new JPanel() {
+            @Override
+            public Dimension getMaximumSize() {
+                return getPreferredSize();
+            }
+        };
+        titleBox.setOpaque(false);
+        titleBox.setLayout(new BoxLayout(titleBox, BoxLayout.Y_AXIS));
+        reaction = reactionButton(() -> {
+            if (current != null) session.react(current);
+        });
+        JPanel titleRow = panel(null);
+        titleRow.setLayout(new BoxLayout(titleRow, BoxLayout.X_AXIS));
+        heading.setMinimumSize(new Dimension(0, heading.getPreferredSize().height));
+        titleRow.add(heading);
+        titleRow.add(Box.createHorizontalStrut(4));
+        titleRow.add(reaction);
+        append(titleBox, titleRow, 3);
+        meta.setMinimumSize(new Dimension(0, meta.getFontMetrics(meta.getFont()).getHeight()));
         append(titleBox, meta, 0);
-        titleBox.setMinimumSize(new Dimension(0, titleBox.getPreferredSize().height));
-        JPanel roomIdentity = panel(new GridBagLayout());
-        GridBagConstraints identityConstraints = new GridBagConstraints();
-        identityConstraints.gridy = 0;
-        identityConstraints.anchor = GridBagConstraints.CENTER;
-        identityConstraints.insets = new Insets(0, 0, 0, 9);
-        roomIdentity.add(new RoomOrb(), identityConstraints);
-        identityConstraints.insets = new Insets(0, 0, 0, 0);
-        roomIdentity.add(titleBox, identityConstraints);
+        titleBox.setAlignmentY(Component.CENTER_ALIGNMENT);
+        JPanel roomIdentity = panel(null);
+        roomIdentity.setLayout(new BoxLayout(roomIdentity, BoxLayout.X_AXIS));
+        roomIdentity.add(Box.createHorizontalGlue());
+        roomIdentity.add(new RoomOrb());
+        roomIdentity.add(Box.createHorizontalStrut(9));
+        roomIdentity.add(titleBox);
         edit = button("비눗방울 수정", false, this::editBubble);
         edit.setIcon(penIcon());
         removeButtonOutline(edit);
-        identityConstraints.insets = new Insets(0, 8, 0, 0);
-        roomIdentity.add(edit, identityConstraints);
+        roomIdentity.add(Box.createHorizontalGlue());
         header.add(roomIdentity, BorderLayout.CENTER);
         JPanel actions = panel(new GridBagLayout());
         JPanel actionRow = panel(new FlowLayout(FlowLayout.RIGHT, 7, 0));
@@ -135,10 +152,12 @@ public final class ChatScreen extends JPanel {
             }
         });
         historyToggle.setSelected(true);
+        actionRow.add(edit);
         actionRow.add(historyToggle);
         end = button("대화 종료", false, () -> {
             UiSession.Room target = current;
-            if (target != null && ActionDialog.confirm(this, "대화를 종료할까요?", "종료")
+            if (target != null && ActionDialog.confirm(this,
+                    "대화를 종료할까요?\n\n모든 참여자의 대화가 끝나며 더 이상 메시지를 보낼 수 없어요.", "종료")
                     && target == current && target.joined && !target.ended) {
                 session.end(target);
             }
@@ -223,6 +242,7 @@ public final class ChatScreen extends JPanel {
         activityTimer = new javax.swing.Timer(1000, e -> {
             updateActivityIndicator();
             edit.setEnabled(canEditBubble());
+            refreshReaction();
         });
         addHierarchyListener(e -> {
             if (isShowing()) {
@@ -323,9 +343,17 @@ public final class ChatScreen extends JPanel {
         end.setEnabled(enabled && owner);
         edit.setVisible(owner);
         edit.setEnabled(canEditBubble());
+        refreshReaction();
         updateActivityIndicator();
         renderHistory();
         renderSpeech();
+    }
+
+    private void refreshReaction() {
+        reaction.setVisible(current != null);
+        if (current != null) {
+            updateReactionButton(reaction, current.reactionCount, session.canReact(current));
+        }
     }
 
     private void renderHistory() {
@@ -528,14 +556,16 @@ public final class ChatScreen extends JPanel {
 
     private static final class RoomOrb extends JComponent {
         RoomOrb() {
-            setPreferredSize(new Dimension(32, 32));
-            setMinimumSize(getPreferredSize());
-            setMaximumSize(getPreferredSize());
+            Dimension size = new Dimension(32, 32);
+            setPreferredSize(size);
+            setMinimumSize(size);
+            setMaximumSize(size);
+            setAlignmentY(Component.CENTER_ALIGNMENT);
         }
+
         @Override
         protected void paintComponent(Graphics source) {
-            Graphics2D g = (Graphics2D) source.create();
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            Graphics2D g = graphics(source);
             g.setPaint(new GradientPaint(4, 3, color("f4efff"), 29, 29, color("a98aea")));
             g.fillOval(1, 1, 30, 30);
             g.setColor(new Color(255, 255, 255, 145));
@@ -575,7 +605,7 @@ public final class ChatScreen extends JPanel {
             setOpaque(false);
             setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
             JLabel lock = label("🔒", 11, color("756d82"));
-            lock.setFont(new Font("Segoe UI Emoji", Font.PLAIN, 11));
+            lock.setFont(UiFonts.scale(new Font("Segoe UI Emoji", Font.PLAIN, 11)));
             add(lock);
             add(label("계정 정보는 보이지 않아요. 이 방에서는 익명으로 대화해요.", 9, color("756d82")));
         }
