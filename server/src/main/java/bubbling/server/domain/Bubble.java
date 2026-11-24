@@ -21,6 +21,7 @@ public class Bubble {
     private BubbleStatus status = BubbleStatus.ALIVE;
     private int reactionCnt = 0;
     private final LocalDateTime createdAt = LocalDateTime.now();
+    private int expireMinute;
     private LocalDateTime expiresAt;
 
     private Bubble(User owner, String title, BubbleCategory category, BubbleMethod method, int maxMemberCnt, boolean isOpen, int expireMinute) {
@@ -30,6 +31,7 @@ public class Bubble {
         this.method = method;
         this.maxMemberCnt = maxMemberCnt;
         this.isOpen = isOpen;
+        this.expireMinute = expireMinute;
         this.expiresAt = LocalDateTime.now().plusMinutes(expireMinute);
     }
 
@@ -56,7 +58,17 @@ public class Bubble {
         this.method = method;
         this.maxMemberCnt = maxMemberCnt;
         this.isOpen = isOpen;
+        this.expireMinute = expireMinute;
         this.expiresAt = LocalDateTime.now().plusMinutes(expireMinute);
+    }
+
+    public synchronized boolean refreshExpiration() {
+        LocalDateTime now = LocalDateTime.now();
+        if (status != BubbleStatus.ALIVE || !expiresAt.isAfter(now)) {
+            return false;
+        }
+        expiresAt = now.plusMinutes(expireMinute);
+        return true;
     }
 
     public synchronized void react() {

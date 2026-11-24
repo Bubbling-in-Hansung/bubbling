@@ -27,8 +27,8 @@ class ClientConfigAndEntryTest {
 
         assertEquals("127.0.0.1", config.getHost());
         assertEquals(8088, config.getPort());
-        assertEquals(1200, config.getWidth());
-        assertEquals(700, config.getHeight());
+        assertEquals(1600, config.getWidth());
+        assertEquals(900, config.getHeight());
         assertEquals(1000, config.getMinWidth());
         assertEquals(600, config.getMinHeight());
     }

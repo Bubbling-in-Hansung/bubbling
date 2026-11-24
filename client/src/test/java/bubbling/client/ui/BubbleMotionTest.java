@@ -1,7 +1,10 @@
 package bubbling.client.ui;
 
+import bubbling.client.ui.drawing.BubbleButton;
 import bubbling.client.ui.drawing.BubbleMotion;
+import bubbling.client.ui.drawing.BubblePlacement;
 import bubbling.client.ui.model.*;
+import bubbling.common.enums.BubbleCategory;
 import org.junit.jupiter.api.Test;
 import javax.swing.*;
 import java.util.List;
@@ -9,9 +12,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BubbleMotionTest {
  private static JButton bubble(JPanel field,int x,int y,double vx,double vy){
-  RoomView view=new RoomView("방","일상","함께 이야기해요",1,4,false,false,false,0,0,0,100);
+  var session = new UiData((type, payload) -> {}).session();
+  var room = session.applyBubble(ServerRoomFixtures.bubble("room", "방", BubbleCategory.DAILY, "2099-01-01T00:00:00"));
+  room.view = new RoomView("방","일상","함께 이야기해요",1,4,false,false,false,0,0,0,100);
   JButton b=new JButton();b.setBounds(x,y,136,136);
-  b.putClientProperty("room",new UiSession(true,List.of(view)).rooms().getFirst());
+  b.putClientProperty("room",room);
   b.putClientProperty("position",new double[]{x,y});b.putClientProperty("velocity",new double[]{vx,vy});field.add(b);return b;
  }
  private static void separated(JButton a,JButton b){
@@ -67,6 +72,45 @@ class BubbleMotionTest {
    JPanel field=new JPanel(null);field.setSize(700,400);
    JButton a=bubble(field,200,130,.5,.3);a.getModel().setPressed(true);
    BubbleMotion.advance(field,10);assertEquals(200,a.getX());assertEquals(130,a.getY());
+  });
+ }
+
+ @Test void reactionThresholdsResizeTheHitAreaAndKeepTheBubbleInsideTheField() throws Exception {
+  SwingUtilities.invokeAndWait(() -> {
+   var session = new UiData((type, payload) -> {}).session();
+   var snapshot = ServerRoomFixtures.bubble("growth", "방", BubbleCategory.DAILY, "2099-01-01T00:00:00");
+   var room = session.applyBubble(snapshot);
+   var field = new JPanel(null);
+   field.setSize(500, 400);
+   var button = new BubbleButton(room);
+   button.putClientProperty("room", room);
+   double[] position = {310, 120};
+   button.putClientProperty("position", position);
+   field.add(button);
+   BubblePlacement.layout(field);
+
+   session.updateReactionCount(room.id, 4);
+   BubblePlacement.layout(field);
+   assertEquals(152, room.bubbleDiameter());
+   assertEquals(310, button.getX());
+   assertFalse(button.contains(177, 102));
+
+   session.updateReactionCount(room.id, 5);
+   BubblePlacement.layout(field);
+   assertEquals(168, room.bubbleDiameter());
+   assertEquals(204, button.getWidth());
+   assertEquals(500, button.getX() + button.getWidth());
+   assertEquals(112, button.getY());
+   assertTrue(button.contains(177, 102));
+   assertSame(position, button.getClientProperty("position"));
+
+   int[][] remainingThresholds = {{9, 168}, {10, 184}, {19, 184}, {20, 200}, {21, 200}};
+   for (int[] threshold : remainingThresholds) {
+    session.updateReactionCount(room.id, threshold[0]);
+    assertEquals(threshold[1], room.bubbleDiameter());
+   }
+   session.applyBubble(snapshot);
+   assertEquals(200, room.bubbleDiameter());
   });
  }
 }

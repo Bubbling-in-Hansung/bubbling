@@ -2,9 +2,13 @@ package bubbling.client.ui;
 
 import bubbling.client.ui.model.*;
 import bubbling.client.ui.screen.ChatScreen;
+import bubbling.common.dto.chat.ChatEndResponse;
+import bubbling.common.dto.chat.ChatMessageDto;
+import bubbling.common.enums.BubbleCategory;
 import org.junit.jupiter.api.Test;
 import javax.swing.*;
 import java.awt.*;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,28 +22,33 @@ class ChatScreenTest {
   }
   return found;
  }
- private static RoomView room(String title){
-  return new RoomView(title,"일상","함께 이야기해요",1,4,false,false,true,0,.2,.2,120);
+ private static RoomView room(UiSession session, String id, String title){
+  var bubble = ServerRoomFixtures.bubble(id, title, BubbleCategory.DAILY, "2099-01-01T00:00:00");
+  return session.applyChatRoom(ServerRoomFixtures.chat(bubble)).view;
+ }
+ private static void receive(UiSession session, String id, String text) {
+  session.applyMessage(new ChatMessageDto(id, "chat-first", "me", "테스터", text, LocalDateTime.now().toString()));
  }
  @Test void repeatedRefreshReusesHistoryAndSpeechAndNewMessagesAppend() throws Exception{
   SwingUtilities.invokeAndWait(()->{
-   RoomView first=room("첫 방"),second=room("둘째 방");
-   UiData data=new UiData(true,List.of(first,second));
-   UiSession session=data.session();var state=session.find(first);
-   session.send(state,"첫 메시지",true);
-   ChatScreen screen=new ChatScreen(data,()->{});screen.showRoom(first);
+   UiData data=new UiData((type, payload) -> {});
+   UiSession session=data.session();
+   RoomView first=room(session, "first", "첫 방"),second=room(session, "second", "둘째 방");
+   ChatScreen screen=new ChatScreen(data,()->{});
+   receive(session, "first-message", "첫 메시지");
+   screen.showRoom(first);
    var initial=textAreas(screen,"첫 메시지");assertEquals(2,initial.size());
    screen.showRoom(first);
    var unchanged=textAreas(screen,"첫 메시지");
    assertEquals(2,unchanged.size());
    for(var area:initial)assertTrue(unchanged.stream().anyMatch(value->value==area));
-   session.send(state,"둘째 메시지",true);screen.showRoom(first);
-   assertTrue(textAreas(screen,"첫 메시지").stream().anyMatch(value->value==initial.getLast()));
+   receive(session, "second-message", "둘째 메시지");screen.showRoom(first);
+   for(var area:initial)assertTrue(textAreas(screen,"첫 메시지").stream().anyMatch(value->value==area));
    assertEquals(2,textAreas(screen,"둘째 메시지").size());
    screen.showRoom(second);assertTrue(textAreas(screen,"첫 메시지").isEmpty());
    screen.showRoom(first);assertEquals(2,textAreas(screen,"첫 메시지").size());
-   session.end(state);screen.showRoom(first);
-   assertEquals(2,textAreas(screen,"첫 메시지").size());
+   session.markEnded(new ChatEndResponse("chat-first", "first"));screen.showRoom(first);
+   assertEquals(1,textAreas(screen,"첫 메시지").size());
   });
  }
 }

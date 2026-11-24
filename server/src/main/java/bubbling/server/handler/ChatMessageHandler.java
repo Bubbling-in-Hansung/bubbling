@@ -6,12 +6,14 @@ import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.common.dto.chat.ChatMessageRequest;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
+import bubbling.server.domain.Bubble;
 import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatMessage;
 import bubbling.server.domain.ChatRoom;
 import bubbling.server.domain.User;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.ChatRoomExceptionCode;
+import bubbling.server.mapper.BubbleMapper;
 import bubbling.server.mapper.ChatMessageMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
@@ -58,6 +60,8 @@ public class ChatMessageHandler {
                 chatMember,
                 request.content()
         );
+        Bubble bubble = chatRoom.getBubble();
+        boolean expirationRefreshed = bubble.refreshExpiration();
 
         // message response
         ChatMessageDto payload = ChatMessageMapper.toDto(chatMessage);
@@ -74,11 +78,20 @@ public class ChatMessageHandler {
                 null,
                 jsonCodec.toPayload(payload)
         );
-        List<User> users = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom).stream()
+        List<ChatMember> activeMembers = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom);
+        List<User> users = activeMembers.stream()
                 .map(ChatMember::getUser)
                 .filter(u -> !u.equals(user))
                 .toList();
         messageSender.sendAllTarget(users, event);
+
+        if (expirationRefreshed) {
+            messageSender.broadcast(new MessageEnvelope(
+                    MessageType.BUBBLE_UPDATED,
+                    null,
+                    jsonCodec.toPayload(BubbleMapper.toDto(bubble, activeMembers.size()))
+            ));
+        }
     }
 
     public void history(ClientConnection connection, MessageEnvelope message) {

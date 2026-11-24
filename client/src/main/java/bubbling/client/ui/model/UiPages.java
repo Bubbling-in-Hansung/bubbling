@@ -2,7 +2,7 @@ package bubbling.client.ui.model;
 
 import java.util.Set;
 
-/** Stable card identifiers shared with preview navigation metadata. */
+/** Stable identifiers for the application screens. */
 public final class UiPages {
     public static final String HOME = "home";
     public static final String PROFILE = "mypage";

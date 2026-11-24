@@ -25,7 +25,7 @@ final class OptionGroup<T> extends JPanel {
         setMinimumSize(new Dimension(0, height));
         ButtonGroup group = new ButtonGroup();
         boolean initialFound = choices.stream().anyMatch(choice -> Objects.equals(choice.value(), initial));
-        T value = initialFound ? initial : choices.getFirst().value();
+        T value = initial == null || initialFound ? initial : choices.getFirst().value();
         for (Choice<T> choice : choices) {
             JToggleButton button = new ChoiceButton(choice.title(), choice.description(), choice.icon());
             button.addItemListener(event -> {

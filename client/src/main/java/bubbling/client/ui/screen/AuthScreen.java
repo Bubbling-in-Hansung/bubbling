@@ -18,21 +18,17 @@ public final class AuthScreen extends JPanel {
 
     private final JPanel card = card(Color.WHITE, 52);
     private final JTextField loginId = input("아이디를 입력해주세요");
-    private final JLabel status = label(" ", 10, PURPLE);
+    private final JLabel status = label(" ", 12, PURPLE);
     private final JButton submit;
 
-    public AuthScreen(boolean signup, Runnable switchMode, Runnable home) {
-        this(signup, switchMode, home, null);
-    }
-
-    public AuthScreen(boolean signup, Runnable switchMode, Runnable home, Submit action) {
+    public AuthScreen(boolean signup, Runnable switchMode, Submit action) {
         setLayout(null);
         card.setLayout(new GridBagLayout());
         add(card);
         JPanel form = column();
-        append(form, label("WELCOME TO BUBBLING", 9, PURPLE), 9);
+        append(form, label("WELCOME TO BUBBLING", 11, PURPLE), 9);
         append(form, title(signup ? "회원가입" : "다시 만나서 반가워요", 24), 7);
-        append(form, label(signup ? "계정 닉네임은 채팅방 랜덤 닉네임과 별개예요." : "당신을 기다리는 마음들이 있어요.", 10, color("918b9a")), 24);
+        append(form, label(signup ? "계정 닉네임은 채팅방 랜덤 닉네임과 별개예요." : "당신을 기다리는 마음들이 있어요.", 12, MUTED), 20);
         if (signup) loginId.putClientProperty("JTextField.placeholderText", "아이디 8~32자 · 영문으로 시작");
         field(form, "아이디", loginId);
         JPasswordField password = passwordField(signup ? "8~64자 · 영문, 숫자, 특수문자 포함" : "비밀번호를 입력해주세요");
@@ -45,21 +41,25 @@ public final class AuthScreen extends JPanel {
             field(form, "계정 닉네임", nickname);
         }
         submit = pending(signup ? "가입 완료" : "로그인");
-        if (action != null) {
-            submit.addActionListener(event -> submit(action, password, confirmation, nickname));
-            if (signup) {
-                password.addActionListener(event -> confirmation.requestFocusInWindow());
-                confirmation.addActionListener(event -> submit.doClick());
-                nickname.addActionListener(event -> submit.doClick());
-            } else {
-                password.addActionListener(event -> submit.doClick());
-            }
-            append(form, status, 8);
+        submit.addActionListener(event -> submit(action, password, confirmation, nickname));
+        if (signup) {
+            password.addActionListener(event -> confirmation.requestFocusInWindow());
+            confirmation.addActionListener(event -> submit.doClick());
+            nickname.addActionListener(event -> submit.doClick());
+        } else {
+            password.addActionListener(event -> submit.doClick());
         }
+        append(form, status, 8);
         submit.setMaximumSize(new Dimension(Integer.MAX_VALUE, 44));
         append(form, submit, 16);
-        append(form, button(signup ? "이미 계정이 있나요?  로그인" : "아직 계정이 없나요?  회원가입", false, switchMode), 8);
-        if (home != null) append(form, button("화면 미리보기", false, home), 0);
+        JPanel modeSwitch = panel(new FlowLayout(FlowLayout.CENTER, 6, 0));
+        modeSwitch.add(label(signup ? "이미 계정이 있나요?" : "아직 계정이 없나요?", 12, MUTED));
+        JButton link = button(signup ? "로그인" : "회원가입", false, switchMode);
+        link.putClientProperty("flat", true);
+        link.setMargin(new Insets(3, 5, 3, 5));
+        link.setFont(font(12, true));
+        modeSwitch.add(link);
+        append(form, modeSwitch, 8);
         form.setPreferredSize(new Dimension(330, Math.max(signup ? 440 : 380, form.getPreferredSize().height)));
         card.add(form);
     }
@@ -79,7 +79,7 @@ public final class AuthScreen extends JPanel {
                 };
             }
         });
-        password.setFont(font(10, false));
+        password.setFont(font(12, false));
         password.setPreferredSize(new Dimension(200, 42));
         password.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
         password.putClientProperty("JTextField.placeholderText", hint);
@@ -112,7 +112,8 @@ public final class AuthScreen extends JPanel {
     }
 
     private void field(JPanel p, String name, JTextField input) {
-        JLabel l = label(name, 9, INK);
+        JLabel l = label(name, 12, INK);
+        input.setFont(font(12, false));
         l.setLabelFor(input);
         append(p, l, 6);
         append(p, input, 12);
