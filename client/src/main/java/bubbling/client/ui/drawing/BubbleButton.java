@@ -110,7 +110,10 @@ public final class BubbleButton extends JButton {
         g.drawArc(start + 7, my - 3, 5, 6, 0, 100);
         g.drawString(count, start + 15, my);
         if (room.view.owner()) {
-            pill(g, "내 방", o + (int) (s * .16) + 14, o + (int) (s * .14), OWNER_FONT, OWNER_PILL_BG, Color.WHITE);
+            String ownerLabel = "내 비눗방울";
+            int ownerWidth = g.getFontMetrics(OWNER_FONT).stringWidth(ownerLabel) + 14;
+            pill(g, ownerLabel, o + (int) (s * .16) + ownerWidth / 2, o + (int) (s * .14),
+                    OWNER_FONT, OWNER_PILL_BG, Color.WHITE);
         }
         if (room.view.privateRoom()) {
             int x = o + (int) (s * .84) - 22, y = o + (int) (s * .17);
