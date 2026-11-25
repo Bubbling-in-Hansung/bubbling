@@ -1,4 +1,4 @@
-package bubbling.server.service;
+package bubbling.server.service.bubble;
 
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.BubbleReaction;

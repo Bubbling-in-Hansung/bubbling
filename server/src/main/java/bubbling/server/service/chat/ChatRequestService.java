@@ -1,4 +1,4 @@
-package bubbling.server.service;
+package bubbling.server.service.chat;
 
 import bubbling.common.enums.ChatRequestStatus;
 import bubbling.server.domain.*;

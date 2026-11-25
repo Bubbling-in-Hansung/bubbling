@@ -1,4 +1,4 @@
-package bubbling.server.security;
+package bubbling.server.service.user;
 
 import org.mindrot.jbcrypt.BCrypt;
 

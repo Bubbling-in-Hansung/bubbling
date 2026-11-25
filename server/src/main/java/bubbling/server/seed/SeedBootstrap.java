@@ -2,7 +2,12 @@ package bubbling.server.seed;
 
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.User;
-import bubbling.server.service.*;
+import bubbling.server.service.bubble.BubbleService;
+import bubbling.server.service.chat.ChatMemberService;
+import bubbling.server.service.chat.ChatMessageService;
+import bubbling.server.service.chat.ChatRequestService;
+import bubbling.server.service.chat.ChatRoomService;
+import bubbling.server.service.user.UserService;
 
 import java.io.IOException;
 import java.io.InputStream;

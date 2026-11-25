@@ -5,7 +5,7 @@ import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.network.MessageSender;
-import bubbling.server.service.BubbleService;
+import bubbling.server.service.bubble.BubbleService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

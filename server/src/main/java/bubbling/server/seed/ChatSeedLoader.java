@@ -2,7 +2,10 @@ package bubbling.server.seed;
 
 import bubbling.common.codec.JsonCodec;
 import bubbling.server.domain.*;
-import bubbling.server.service.*;
+import bubbling.server.service.chat.ChatMemberService;
+import bubbling.server.service.chat.ChatMessageService;
+import bubbling.server.service.chat.ChatRequestService;
+import bubbling.server.service.chat.ChatRoomService;
 
 import java.io.IOException;
 import java.io.InputStream;

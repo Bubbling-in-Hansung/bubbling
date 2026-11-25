@@ -6,7 +6,12 @@ import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.*;
 import bubbling.server.fixture.BubbleFixtures;
 import bubbling.server.fixture.UserFixtures;
-import bubbling.server.security.PasswordService;
+import bubbling.server.service.chat.ChatMemberService;
+import bubbling.server.service.chat.ChatMessageService;
+import bubbling.server.service.chat.ChatRoomService;
+import bubbling.server.service.user.PasswordService;
+import bubbling.server.service.user.AuthService;
+import bubbling.server.service.user.UserService;
 import bubbling.server.store.*;
 
 import org.junit.jupiter.api.BeforeEach;

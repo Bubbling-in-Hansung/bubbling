@@ -1,10 +1,9 @@
-package bubbling.server.service;
+package bubbling.server.service.user;
 
 import bubbling.server.domain.User;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.AuthExceptionCode;
 import bubbling.server.exception.code.GlobalExceptionCode;
-import bubbling.server.security.PasswordService;
 
 import java.util.Objects;
 

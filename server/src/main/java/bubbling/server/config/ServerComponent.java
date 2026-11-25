@@ -7,9 +7,18 @@ import bubbling.server.network.MessageDispatcher;
 import bubbling.server.network.MessageSender;
 import bubbling.server.notifier.OnlineStatusNotifier;
 import bubbling.server.scheduler.BubbleExpirationScheduler;
-import bubbling.server.security.PasswordService;
 import bubbling.server.seed.SeedBootstrap;
-import bubbling.server.service.*;
+import bubbling.server.service.bubble.BubbleReactionService;
+import bubbling.server.service.bubble.BubbleService;
+import bubbling.server.service.chat.ChatMemberService;
+import bubbling.server.service.chat.ChatMessageService;
+import bubbling.server.service.chat.ChatRequestService;
+import bubbling.server.service.chat.ChatRoomService;
+import bubbling.server.service.game.GameResultService;
+import bubbling.server.service.game.search.GameResultSearchStrategyResolver;
+import bubbling.server.service.user.AuthService;
+import bubbling.server.service.user.PasswordService;
+import bubbling.server.service.user.UserService;
 import bubbling.server.store.*;
 
 public class ServerComponent {
@@ -30,6 +39,8 @@ public class ServerComponent {
     private final ChatMessageService chatMessageService;
     private final ChatMemberService chatMemberService;
     private final ChatRequestService chatRequestService;
+    private final GameResultService gameResultService;
+    private final GameResultSearchStrategyResolver gameResultSearchStrategyResolver;
 
     public ServerComponent() {
         this.clientRegistry = new ClientRegistry();
@@ -45,6 +56,7 @@ public class ServerComponent {
         ChatMessageStore chatMessageStore = new ChatMessageStore();
         ChatMemberStore chatMemberStore = new ChatMemberStore();
         ChatRequestStore chatRequestStore = new ChatRequestStore();
+        GameResultStore gameResultStore = new GameResultStore();
 
         PasswordService passwordService = new PasswordService();
 
@@ -56,6 +68,8 @@ public class ServerComponent {
         this.chatRequestService = new ChatRequestService(chatRequestStore, chatRoomService, chatMemberService);
         this.bubbleReactionService = new BubbleReactionService(bubbleReactionStore);
         this.bubbleService = new BubbleService(bubbleStore, bubbleReactionService, chatRoomService, chatRequestService);
+        this.gameResultService = new GameResultService(gameResultStore);
+        this.gameResultSearchStrategyResolver = new GameResultSearchStrategyResolver(gameResultStore);
 
         this.bubbleExpirationScheduler = new BubbleExpirationScheduler(bubbleService, messageSender);
 
@@ -77,6 +91,8 @@ public class ServerComponent {
         registerChatRoomHandlers();
         registerChatRequestHandlers();
         registerChatMessageHandlers();
+        registerChatTypingHandlers();
+        registerGameResultHandlers();
         registerSystemHandlers();
     }
 
@@ -209,6 +225,12 @@ public class ServerComponent {
                 true,
                 handler::list
         );
+
+        messageDispatcher.register(
+                MessageType.CHAT_POSITION_REQUEST,
+                true,
+                handler::position
+        );
     }
 
     private void registerChatRequestHandlers() {
@@ -262,6 +284,40 @@ public class ServerComponent {
                 MessageType.CHAT_HISTORY_REQUEST,
                 true,
                 handler::history
+        );
+    }
+
+    private void registerChatTypingHandlers() {
+        ChatTypingHandler handler = new ChatTypingHandler(
+                chatRoomService,
+                chatMemberService,
+                messageSender
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_TYPING,
+                true,
+                handler::typing
+        );
+    }
+
+    private void registerGameResultHandlers() {
+        GameResultHandler handler = new GameResultHandler(
+                gameResultService,
+                gameResultSearchStrategyResolver,
+                messageSender
+        );
+
+        messageDispatcher.register(
+                MessageType.GAME_RANKING_REQUEST,
+                true,
+                handler::ranking
+        );
+
+        messageDispatcher.register(
+                MessageType.GAME_RESULT_REQUEST,
+                true,
+                handler::result
         );
     }
 

@@ -5,7 +5,7 @@ import bubbling.common.enums.BubbleCategory;
 import bubbling.common.enums.BubbleMethod;
 import bubbling.server.domain.Bubble;
 import bubbling.server.domain.User;
-import bubbling.server.service.BubbleService;
+import bubbling.server.service.bubble.BubbleService;
 
 import java.io.IOException;
 import java.io.InputStream;
