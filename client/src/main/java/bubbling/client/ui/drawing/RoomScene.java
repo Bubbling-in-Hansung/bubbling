@@ -23,6 +23,7 @@ public final class RoomScene extends JComponent {
     private static final Color FALLBACK_BG = color("e6f4f7"), EMPTY_HINT_INK = color("5e5871"),
             NAME_PILL_BG = new Color(255, 255, 255, 220);
     private List<ChatParticipantDto> participants = List.of();
+    private final java.util.List<String> drawOrder = new java.util.ArrayList<>();
     private String myMemberId;
     private Point2D.Double ownPosition;
     private java.util.function.IntSupplier character = () -> 0;
@@ -33,18 +34,57 @@ public final class RoomScene extends JComponent {
     public void showParticipants(List<ChatParticipantDto> participants, String myMemberId) {
         this.participants = participants;
         this.myMemberId = myMemberId;
+        int visibleCount = Math.min(MAX_VISIBLE_PARTICIPANTS, participants.size());
+        java.util.List<String> visibleIds = new java.util.ArrayList<>(visibleCount);
+        for (int i = 0; i < visibleCount; i++) {
+            visibleIds.add(participants.get(i).chatMemberId());
+        }
+        drawOrder.retainAll(visibleIds);
+        for (String id : visibleIds) {
+            if (!drawOrder.contains(id)) {
+                drawOrder.add(id);
+            }
+        }
         repaint();
+    }
+
+    public void bringToFront(String memberId) {
+        if (memberId == null) return;
+        if (drawOrder.remove(memberId)) {
+            drawOrder.add(memberId);
+        }
     }
 
     public void moveOwnCharacter(Point target) {
         if (getWidth() <= 0 || getHeight() <= 0) return;
         ownPosition = new Point2D.Double((double) target.x / getWidth(), (double) target.y / getHeight());
+        bringToFront(myMemberId);
         repaint();
     }
 
     public void resetOwnPosition() {
         ownPosition = null;
+        drawOrder.clear();
         repaint();
+    }
+
+    public List<Integer> paintOrder() {
+        int visibleCount = Math.min(MAX_VISIBLE_PARTICIPANTS, participants.size());
+        java.util.List<Integer> order = new java.util.ArrayList<>(visibleCount);
+        for (String id : drawOrder) {
+            for (int i = 0; i < visibleCount; i++) {
+                if (participants.get(i).chatMemberId().equals(id)) {
+                    order.add(i);
+                    break;
+                }
+            }
+        }
+        for (int i = 0; i < visibleCount; i++) {
+            if (!order.contains(i)) {
+                order.add(i);
+            }
+        }
+        return java.util.Collections.unmodifiableList(order);
     }
 
     public Point participantHead(int participant) {
@@ -86,7 +126,7 @@ public final class RoomScene extends JComponent {
         if (participants.isEmpty()) {
             centered(g, "대화에 참여하면 캐릭터가 표시돼요", w / 2, h - 25, 11, EMPTY_HINT_INK);
         } else {
-            for (int i = 0; i < Math.min(MAX_VISIBLE_PARTICIPANTS, participants.size()); i++) {
+            for (int i : paintOrder()) {
                 ChatParticipantDto participant = participants.get(i);
                 Point head = participantHead(i);
                 String name = participant.nickname();
