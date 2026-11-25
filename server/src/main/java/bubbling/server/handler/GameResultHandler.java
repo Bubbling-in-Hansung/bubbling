@@ -8,6 +8,8 @@ import bubbling.common.dto.game.GameResultRequest;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.GameExceptionCode;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
 import bubbling.server.service.game.GameResultService;
@@ -45,7 +47,12 @@ public class GameResultHandler {
 
         GameResultSearchStrategy strategy = resolver.resolve(request.rankingType());
 
-        List<GameRankingData> rankings = strategy.aggregate(request.gameType()).subList(0, request.limit());
+        if(request.limit() < 1) {
+            throw new BaseException(GameExceptionCode.INVALID_SEARCH_CONDITION);
+        }
+
+        List<GameRankingData> results = strategy.aggregate(request.gameType());
+        List<GameRankingData> rankings = results.subList(0, Math.min(results.size(), request.limit()));
 
         GameRankingResponse payload = new GameRankingResponse(
                 request.rankingType(),
@@ -53,7 +60,7 @@ public class GameResultHandler {
                 LocalDateTime.now()
         );
         MessageEnvelope response = new MessageEnvelope(
-                MessageType.BUBBLE_REMOVED,
+                MessageType.GAME_RANKING,
                 message.requestId(),
                 jsonCodec.toPayload(payload)
         );
