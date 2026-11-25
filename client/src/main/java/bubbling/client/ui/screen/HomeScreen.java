@@ -212,7 +212,7 @@ public final class HomeScreen extends JPanel {
                     refresh();
                 }
             });
-            remove.setEnabled(!r.removed);
+            remove.setEnabled(!r.deleted);
             JPanel ownerActions = panel(new GridLayout(1, 2, 7, 0));
             edit.setText("수정");
             edit.setIcon(penIcon());

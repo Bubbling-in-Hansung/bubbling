@@ -30,6 +30,7 @@ public final class UiSession {
         public boolean joined;
         public boolean ended;
         public boolean removed;
+        public boolean deleted;
         public boolean visited;
         public boolean listed;
         public Instant expiresAt;
@@ -141,6 +142,7 @@ public final class UiSession {
         room.people = bubble.currentMemberCnt();
         room.reactionCount = Math.max(room.reactionCount, bubble.reactionCount());
         room.removed = bubble.status() != BubbleStatus.ALIVE;
+        room.deleted = bubble.status() == BubbleStatus.DELETED;
         return room;
     }
 
@@ -161,8 +163,10 @@ public final class UiSession {
     public void applyChatRooms(ChatRoomDto[] conversations) {
         rooms.values().forEach(room -> room.listed = false);
         for (ChatRoomDto conversation : conversations) applyChatRoom(conversation);
-        rooms.values().stream().filter(room -> room.conversation != null && !room.listed)
-                .forEach(room -> room.joined = false);
+        rooms.values().stream().filter(room -> !room.listed).forEach(room -> {
+            room.joined = false;
+            room.visited = false;
+        });
     }
 
     public void markLeft(String id) {
@@ -170,6 +174,7 @@ public final class UiSession {
         if (room != null) {
             room.joined = false;
             room.listed = false;
+            room.visited = false;
         }
     }
 
@@ -194,8 +199,10 @@ public final class UiSession {
         room.removed = true;
         if (event.status() == BubbleStatus.DELETED) {
             ownedBubbles.remove(event.bubbleId());
+            room.deleted = true;
             room.joined = false;
             room.listed = false;
+            room.visited = false;
             room.ended = room.conversation != null;
             if (room.id.equals(recent)) recent = null;
         }

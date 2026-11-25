@@ -24,6 +24,7 @@ import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.system.OnlineStatusDto;
 import bubbling.common.dto.user.UserDto;
 import bubbling.common.dto.user.UserUpdateRequest;
+import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRequestRole;
 import bubbling.common.enums.ChatRequestStatus;
 import bubbling.common.enums.ProfileCharacter;
@@ -125,6 +126,9 @@ public final class LiveSession {
         });
         onAuthenticated(dispatcher, BUBBLE_REMOVED, BubbleRemovedEvent.class, event -> {
             state.markBubbleRemoved(event);
+            if (event.status() == BubbleStatus.DELETED) {
+                view.returnFromChat(event.bubbleId());
+            }
             view.refreshLiveState();
             refreshRooms();
         });
@@ -281,6 +285,10 @@ public final class LiveSession {
 
     public void requestAccount() {
         send(USER_INFO_REQUEST, null);
+    }
+
+    public void requestChatRooms() {
+        send(MY_CHAT_ROOM_LIST_REQUEST, null);
     }
 
     public void updateProfile(ProfileCharacter profile) {

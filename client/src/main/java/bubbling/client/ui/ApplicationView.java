@@ -270,6 +270,9 @@ public final class ApplicationView extends JPanel {
             unreadApprovals = 0;
             updateChatBadge();
             conversations.onEnter();
+            if (changedPage) {
+                live.requestChatRooms();
+            }
         }
         if (UiPages.usesShell(page)) {
             pages.show(deck, "shell");

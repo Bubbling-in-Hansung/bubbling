@@ -83,6 +83,8 @@ class LiveProtocolTest {
         SwingUtilities.invokeAndWait(() -> {
             assertEquals("home", application.get().currentPage());
             assertFalse(data.session().room("shared").joined);
+            assertFalse(data.session().room("shared").listed);
+            assertFalse(data.session().room("shared").visited);
             assertTrue(data.session().room("owned").joined);
             assertEquals(MY_CHAT_ROOM_LIST_REQUEST, sent.getLast().type());
             var updated = bubble("owned", "2099-01-01T00:30:00");
@@ -123,6 +125,27 @@ class LiveProtocolTest {
         state.markBubbleRemoved(new BubbleRemovedEvent("bubble", BubbleStatus.EXPIRED));
         assertEquals(ChatRequestStatus.CANCELLED, state.requests().getFirst().status);
         assertEquals(ChatRequestStatus.ACCEPTED, state.requests().getLast().status);
+    }
+
+    @Test
+    void marksBubbleDeletedAndClearsConversationListing() {
+        var state = new UiData((type, payload) -> {}).session();
+        var bubble = bubble("owned");
+        var room = state.applyChatRoom(chat(bubble, true));
+        state.visit(room);
+        assertTrue(room.listed);
+        assertTrue(room.visited);
+        assertFalse(room.deleted);
+
+        state.markBubbleRemoved(new BubbleRemovedEvent("owned", BubbleStatus.EXPIRED));
+        assertTrue(room.removed);
+        assertFalse(room.deleted);
+
+        state.markBubbleRemoved(new BubbleRemovedEvent("owned", BubbleStatus.DELETED));
+        assertTrue(room.deleted);
+        assertFalse(room.listed);
+        assertFalse(room.visited);
+        assertFalse(room.joined);
     }
 
     private static BubbleDto bubble(String id) {
