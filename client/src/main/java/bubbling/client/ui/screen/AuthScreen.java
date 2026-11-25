@@ -1,16 +1,15 @@
 package bubbling.client.ui.screen;
 
-import com.formdev.flatlaf.ui.FlatPasswordFieldUI;
-
 import javax.swing.*;
-import javax.swing.text.Element;
-import javax.swing.text.PasswordView;
-import javax.swing.text.View;
 import java.awt.*;
 import java.util.Arrays;
 import static bubbling.client.ui.style.Styles.*;
 
 public final class AuthScreen extends JPanel {
+    private static final Color GRADIENT_START = color("7650e3"), GRADIENT_END = color("9c78f1"),
+            OVAL_SOFT = new Color(255, 255, 255, 20), SUBTITLE_INK = new Color(255, 255, 255, 180),
+            OVAL_OUTLINE = new Color(255, 255, 255, 65);
+
     @FunctionalInterface
     public interface Submit {
         void accept(String loginId, String password, String nickname);
@@ -31,10 +30,10 @@ public final class AuthScreen extends JPanel {
         append(form, label(signup ? "계정 닉네임은 채팅방 랜덤 닉네임과 별개예요." : "당신을 기다리는 마음들이 있어요.", 12, MUTED), 20);
         if (signup) loginId.putClientProperty("JTextField.placeholderText", "아이디 8~32자 · 영문으로 시작");
         field(form, "아이디", loginId);
-        JPasswordField password = passwordField(signup ? "8~64자 · 영문, 숫자, 특수문자 포함" : "비밀번호를 입력해주세요");
+        JPasswordField password = passwordInput(signup ? "8~64자 · 영문, 숫자, 특수문자 포함" : "비밀번호를 입력해주세요");
         if (signup) password.setToolTipText("허용 특수문자: !@#$%^&*");
         field(form, "비밀번호", password);
-        JPasswordField confirmation = signup ? passwordField("비밀번호를 한 번 더 입력해주세요") : null;
+        JPasswordField confirmation = signup ? passwordInput("비밀번호를 한 번 더 입력해주세요") : null;
         JTextField nickname = input("사용할 닉네임을 입력해주세요");
         if (signup) {
             field(form, "비밀번호 확인", confirmation);
@@ -62,28 +61,6 @@ public final class AuthScreen extends JPanel {
         append(form, modeSwitch, 8);
         form.setPreferredSize(new Dimension(330, Math.max(signup ? 440 : 380, form.getPreferredSize().height)));
         card.add(form);
-    }
-
-    private static JPasswordField passwordField(String hint) {
-        JPasswordField password = new JPasswordField();
-        password.setUI(new FlatPasswordFieldUI() {
-            @Override
-            public View create(Element element) {
-                return new PasswordView(element) {
-                    @Override
-                    protected int drawEchoCharacter(Graphics graphics, int x, int y, char mask) {
-                        super.drawEchoCharacter(graphics, x, y, mask);
-                        // Use the same character advance as Swing's caret and selection.
-                        return x + password.getFontMetrics(password.getFont()).charWidth(mask);
-                    }
-                };
-            }
-        });
-        password.setFont(font(12, false));
-        password.setPreferredSize(new Dimension(200, 42));
-        password.setMaximumSize(new Dimension(Integer.MAX_VALUE, 42));
-        password.putClientProperty("JTextField.placeholderText", hint);
-        return password;
     }
 
     private void submit(Submit action, JPasswordField password, JPasswordField confirmation, JTextField nickname) {
@@ -127,18 +104,18 @@ public final class AuthScreen extends JPanel {
     protected void paintComponent(Graphics source) {
         Graphics2D g = graphics(source);
         int w = getWidth(), h = getHeight();
-        g.setPaint(new GradientPaint(0, 0, color("7650e3"), w, h, color("9c78f1")));
+        g.setPaint(new GradientPaint(0, 0, GRADIENT_START, w, h, GRADIENT_END));
         g.fillRect(0, 0, w, h);
-        g.setColor(new Color(255, 255, 255, 20));
+        g.setColor(OVAL_SOFT);
         g.fillOval(- 180, - 240, 550, 550);
         g.fillOval(w / 3, h - 150, 450, 450);
         int x = Math.max(70, (int) (w * .09)), y = h / 2 - 160;
         logo(g, x, y, Color.WHITE, 27);
         text(g, "말하지 못한 마음을", x, y + 125, 29, Color.WHITE, false);
         text(g, "가볍게 띄워보세요", x, y + 168, 29, Color.WHITE, true);
-        text(g, "누군가의 마음에 닿는 순간,", x, y + 218, 12, new Color(255, 255, 255, 180), false);
-        text(g, "당신의 고민은 조금 더 가벼워질 거예요.", x, y + 242, 12, new Color(255, 255, 255, 180), false);
-        g.setColor(new Color(255, 255, 255, 65));
+        text(g, "누군가의 마음에 닿는 순간,", x, y + 218, 12, SUBTITLE_INK, false);
+        text(g, "당신의 고민은 조금 더 가벼워질 거예요.", x, y + 242, 12, SUBTITLE_INK, false);
+        g.setColor(OVAL_OUTLINE);
         g.setStroke(new BasicStroke(1));
         g.drawOval((int) (w * .525) - 170, 120, 110, 110);
         g.drawOval(75, h - 125, 55, 55);

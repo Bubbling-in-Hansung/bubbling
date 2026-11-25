@@ -44,4 +44,32 @@ public final class MessageText {
         result.add(line.toString());
         return List.copyOf(result);
     }
+
+    /** Wraps grapheme code points to fit pixel width and clamps overflow with an ellipsis. */
+    public static List<String> wrapWithEllipsis(String text, java.util.function.ToIntFunction<String> width,
+            int maxWidth, int maxLines) {
+        List<String> lines = new ArrayList<>();
+        StringBuilder line = new StringBuilder();
+        for (int codePoint : text.codePoints().toArray()) {
+            String next = Character.toString(codePoint);
+            if (!line.isEmpty() && width.applyAsInt(line + next) > maxWidth) {
+                lines.add(line.toString());
+                line.setLength(0);
+            }
+            line.append(next);
+        }
+        if (!line.isEmpty() || lines.isEmpty()) {
+            lines.add(line.toString());
+        }
+        int limit = Math.max(1, maxLines);
+        if (lines.size() > limit) {
+            lines.subList(limit, lines.size()).clear();
+            String last = lines.getLast();
+            while (!last.isEmpty() && width.applyAsInt(last + "…") > maxWidth) {
+                last = last.substring(0, last.offsetByCodePoints(last.length(), -1));
+            }
+            lines.set(limit - 1, last + "…");
+        }
+        return List.copyOf(lines);
+    }
 }

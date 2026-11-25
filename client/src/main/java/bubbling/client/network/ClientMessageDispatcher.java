@@ -6,6 +6,7 @@ import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static bubbling.common.protocol.MessageType.*;
@@ -27,11 +28,14 @@ public class ClientMessageDispatcher {
     }
 
     public void register(MessageType type, Command handler) {
-        handlers.put(type, handler);
+        handlers.put(
+                Objects.requireNonNull(type, "메시지 타입은 필수입니다."),
+                Objects.requireNonNull(handler, "핸들러는 필수입니다.")
+        );
     }
 
     public void onDisconnect(Runnable handler) {
-        disconnectHandler = handler;
+        disconnectHandler = Objects.requireNonNull(handler, "종료 핸들러는 필수입니다.");
     }
 
     void disconnected() {
@@ -53,6 +57,13 @@ public class ClientMessageDispatcher {
 
     public void reportFailure(MessageType type, RuntimeException failure) {
         System.err.println("메시지 처리 실패 (" + type + "): " + failure.getClass().getSimpleName());
+    }
+
+    public <T> T decode(MessageEnvelope message, Class<T> type) {
+        Objects.requireNonNull(message, "메시지는 필수입니다.");
+        Objects.requireNonNull(type, "대상 타입은 필수입니다.");
+        return Objects.requireNonNull(codec.fromPayload(message.payload(), type),
+                "메시지 페이로드가 비어 있습니다: " + message.type());
     }
 
     public ExceptionResponse decodeError(MessageEnvelope message) {

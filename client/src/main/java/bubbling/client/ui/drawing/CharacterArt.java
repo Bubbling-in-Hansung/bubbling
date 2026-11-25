@@ -9,6 +9,9 @@ import java.util.EnumMap;
 
 /** Classpath images cached once; presentation order is independent of wire values. */
 public final class CharacterArt {
+    public static final int BASE_WIDTH = 72;
+    public static final int BASE_HEIGHT = 95;
+    private static final Color FALLBACK_OVAL = new Color(230, 222, 247);
     private static final EnumMap<CharacterChoice, BufferedImage> IMAGES = new EnumMap<>(CharacterChoice.class);
     static {
         for (var value : CharacterChoice.values()) {
@@ -30,14 +33,14 @@ public final class CharacterArt {
         var g = (Graphics2D) source.create();
         try {
             if (image == null) {
-                g.setColor(new Color(230, 222, 247));
-                g.fillOval(x, y, (int) (72 * scale), (int) (95 * scale));
+                g.setColor(FALLBACK_OVAL);
+                g.fillOval(x, y, (int) (BASE_WIDTH * scale), (int) (BASE_HEIGHT * scale));
                 return;
             }
-            double fit = Math.min(72.0 / image.getWidth(), 95.0 / image.getHeight()) * scale;
+            double fit = Math.min((double) BASE_WIDTH / image.getWidth(), (double) BASE_HEIGHT / image.getHeight()) * scale;
             int w = (int) Math.round(image.getWidth() * fit), h = (int) Math.round(image.getHeight() * fit);
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g.drawImage(image, x + ((int) (72 * scale) - w) / 2, y + (int) (95 * scale) - h, w, h, null);
+            g.drawImage(image, x + ((int) (BASE_WIDTH * scale) - w) / 2, y + (int) (BASE_HEIGHT * scale) - h, w, h, null);
         } finally {
             g.dispose();
         }

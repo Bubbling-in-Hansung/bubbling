@@ -25,11 +25,11 @@ public final class BubblePlacement {
         // Existing bubbles are anchors, including after a filter or detail-panel resize.
         for (Component component : field.getComponents()) {
             JComponent button = (JComponent) component;
-            double[] position = (double[]) button.getClientProperty("position");
+            double[] position = BubbleGeometry.position(button);
             if (position == null) {
                 continue;
             }
-            int diameter = ((UiSession.Room) button.getClientProperty("room")).bubbleDiameter();
+            int diameter = BubbleGeometry.room(button).bubbleDiameter();
             int size = diameter + SHADOW * 2;
             if (button.getWidth() > 0 && button.getWidth() != size) {
                 double centerShift = (size - button.getWidth()) / 2.0;
@@ -41,10 +41,10 @@ public final class BubblePlacement {
         }
         for (Component component : field.getComponents()) {
             JComponent button = (JComponent) component;
-            if (button.getClientProperty("position") != null) {
+            if (BubbleGeometry.position(button) != null) {
                 continue;
             }
-            UiSession.Room room = (UiSession.Room) button.getClientProperty("room");
+            UiSession.Room room = BubbleGeometry.room(button);
             int diameter = room.bubbleDiameter();
             int size = diameter + SHADOW * 2;
             int maxX = Math.max(0, field.getWidth() - size), maxY = Math.max(0, field.getHeight() - size);
@@ -65,7 +65,7 @@ public final class BubblePlacement {
             double[] position = {
                 x, y
             };
-            button.putClientProperty("position", position);
+            BubbleGeometry.setPosition(button, position);
             apply(button, position, diameter);
             placed.add(circle(position, diameter));
         }

@@ -11,19 +11,12 @@ public final class ActionDialog {
 
     public static boolean confirm(Component source, String message, String action) {
         String heading = action + " 확인";
-        JDialog dialog = new JDialog(dialogOwner(source), heading, Dialog.ModalityType.APPLICATION_MODAL);
+        JDialog dialog = new JDialog(ModalStyle.resolveOwner(source), heading, Dialog.ModalityType.APPLICATION_MODAL);
         ModalStyle.prepare(dialog);
         JPanel body = ModalStyle.surface(14);
         body.add(heading(heading), BorderLayout.NORTH);
 
-        JTextArea copy = new JTextArea(message == null || message.isBlank() ? "다시 시도해 주세요." : message);
-        copy.setFont(font(12, false));
-        copy.setForeground(color("625b70"));
-        copy.setOpaque(false);
-        copy.setEditable(false);
-        copy.setCaretColor(new Color(0, 0, 0, 0));
-        copy.setLineWrap(true);
-        copy.setWrapStyleWord(true);
+        JTextArea copy = ModalStyle.messageArea(message, 12);
         copy.setBorder(BorderFactory.createEmptyBorder(2, 5, 2, 5));
         copy.getAccessibleContext().setAccessibleName("알림 내용");
         JScrollPane text = ModalStyle.scrollContent(copy);
@@ -49,23 +42,13 @@ public final class ActionDialog {
         return accepted[0];
     }
 
-    private static Window dialogOwner(Component source) {
-        Window owner = source instanceof Window window ? window
-                : source == null ? null : SwingUtilities.getWindowAncestor(source);
-        Window active = KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow();
-        for (Window window = active; window != null; window = window.getOwner()) {
-            if (window == owner) return active;
-        }
-        return owner;
-    }
-
     private static JPanel heading(String heading) {
         JPanel header = panel(new BorderLayout(12, 0));
-        JPanel badge = card(color("fff0f4"), 18);
+        JPanel badge = card(DANGER_BG, 18);
         badge.setLayout(new GridBagLayout());
         badge.setPreferredSize(new Dimension(42, 42));
         JLabel mark = title("!", 18);
-        mark.setForeground(color("a44660"));
+        mark.setForeground(DANGER_INK);
         badge.add(mark);
         header.add(badge, BorderLayout.WEST);
         header.add(title(heading, 16), BorderLayout.CENTER);

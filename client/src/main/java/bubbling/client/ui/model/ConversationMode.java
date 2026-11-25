@@ -1,6 +1,7 @@
 package bubbling.client.ui.model;
 
 import bubbling.common.enums.BubbleMethod;
+import java.util.Arrays;
 
 /** Client labels for existing common methods; does not alter wire values. */
 public enum ConversationMode {
@@ -28,6 +29,14 @@ public enum ConversationMode {
 
     public String label() {
         return label;
+    }
+
+    public static ConversationMode fromMethod(BubbleMethod method) {
+        return Arrays.stream(values()).filter(value -> value.method == method).findFirst().orElseThrow();
+    }
+
+    public static ConversationMode fromLabel(String label) {
+        return Arrays.stream(values()).filter(value -> value.label.equals(label)).findFirst().orElseThrow();
     }
 
     @Override

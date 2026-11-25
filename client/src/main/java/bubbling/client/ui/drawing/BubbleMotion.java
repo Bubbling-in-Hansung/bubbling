@@ -22,8 +22,8 @@ public final class BubbleMotion {
         Body(JButton b, JPanel field) {
             button = b;
             p = position(b);
-            v = (double[]) b.getClientProperty("velocity");
-            radius = ((UiSession.Room) b.getClientProperty("room")).bubbleDiameter() / 2.0;
+            v = BubbleGeometry.velocity(b);
+            radius = BubbleGeometry.room(b).bubbleDiameter() / 2.0;
             offset = BubbleGeometry.SHADOW_PADDING + radius;
             speed = Math.hypot(v[0], v[1]);
             fixed = b.getModel().isRollover() || b.getModel().isPressed();
@@ -50,12 +50,12 @@ public final class BubbleMotion {
             }
         }
         private static double[] position(JButton b) {
-            double[] p = (double[]) b.getClientProperty("position");
+            double[] p = BubbleGeometry.position(b);
             if (p == null) {
                 p = new double[] {
                     b.getX(), b.getY()
                 };
-                b.putClientProperty("position", p);
+                BubbleGeometry.setPosition(b, p);
             }
             return p;
         }

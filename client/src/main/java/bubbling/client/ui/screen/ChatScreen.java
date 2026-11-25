@@ -14,12 +14,19 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
-import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import static bubbling.client.ui.style.Styles.*;
 
 public final class ChatScreen extends JPanel {
+    private static final int SPEECH_REFRESH_MS = 200;
+    private static final int ACTIVITY_REFRESH_MS = 1000;
+    private static final int MAX_INPUT_WIDTH = 680;
+    private static final Color HEADER_LINE = color("d8d5df"), TIMESTAMP_INK = color("938d9b"),
+            INPUT_SHADOW = new Color(45, 36, 65, 28), INPUT_FILL = new Color(255, 255, 255, 224),
+            INPUT_BORDER = new Color(255, 255, 255, 235), ORB_LIGHT = color("f4efff"),
+            ORB_DARK = color("a98aea"), ORB_RIM = new Color(255, 255, 255, 145),
+            NOTICE_INK = color("756d82");
     private final UiSession session;
     private final JLabel heading = title("대화 공간", 16), meta = label("", 11, MUTED);
     private final JPanel history = column(), speech = column();
@@ -47,7 +54,7 @@ public final class ChatScreen extends JPanel {
         JPanel header = panel(new BorderLayout(16, 0));
         header.setOpaque(true);
         header.setBackground(Color.WHITE);
-        header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, color("d8d5df")),
+        header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, HEADER_LINE),
                 BorderFactory.createEmptyBorder(12, 18, 4, 18)));
         header.setPreferredSize(new Dimension(0, 70));
         JButton backButton = button("홈으로", false, back);
@@ -191,11 +198,11 @@ public final class ChatScreen extends JPanel {
                 super.paintComponent(source);
                 Graphics2D g = (Graphics2D) source.create();
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(new Color(45, 36, 65, 28));
+                g.setColor(INPUT_SHADOW);
                 g.fillRoundRect(1, 4, getWidth() - 2, getHeight() - 5, 24, 24);
-                g.setColor(new Color(255, 255, 255, 224));
+                g.setColor(INPUT_FILL);
                 g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 5, 24, 24);
-                g.setColor(new Color(255, 255, 255, 235));
+                g.setColor(INPUT_BORDER);
                 g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 5, 24, 24);
                 g.dispose();
             }
@@ -212,7 +219,7 @@ public final class ChatScreen extends JPanel {
         scene.add(inputArea);
         scene.addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentResized(java.awt.event.ComponentEvent e) {
-                int width = Math.min(680, (int) (scene.getWidth() * .78));
+                int width = Math.min(MAX_INPUT_WIDTH, (int) (scene.getWidth() * .78));
                 Dimension size = inputArea.getPreferredSize();
                 inputArea.setBounds((scene.getWidth() - width) / 2, scene.getHeight() - size.height - 15, width, size.height);
             }
@@ -238,8 +245,8 @@ public final class ChatScreen extends JPanel {
                 }
             }
         });
-        timer = new javax.swing.Timer(200, e -> renderSpeech());
-        activityTimer = new javax.swing.Timer(1000, e -> {
+        timer = new javax.swing.Timer(SPEECH_REFRESH_MS, e -> renderSpeech());
+        activityTimer = new javax.swing.Timer(ACTIVITY_REFRESH_MS, e -> {
             updateActivityIndicator();
             edit.setEnabled(canEditBubble());
             refreshReaction();
@@ -321,7 +328,7 @@ public final class ChatScreen extends JPanel {
             return;
         }
         if (!MessageText.acceptsInput(input.getText()) || MessageText.lines(input.getText(), input.getFontMetrics(font(11,
-                false))::stringWidth, MessageBubble.MAX_WIDTH - 24).size() > MessageText.MAX_LINES) {
+                false))::stringWidth, MessageBubble.MAX_TEXT_WIDTH).size() > MessageText.MAX_LINES) {
             NotificationCards.info(this, "메시지 입력 안내",
                     "메시지는 공백 포함 " + MessageText.MAX_LENGTH + "자, 최대 " + MessageText.MAX_LINES
                     + "줄까지 입력할 수 있어요.");
@@ -417,7 +424,7 @@ public final class ChatScreen extends JPanel {
         layout.setAlignOnBaseline(true);
         JPanel author = panel(layout);
         author.add(label(message.sender(), 11, Color.BLACK));
-        if (message.at() != null) author.add(label(" · " + MESSAGE_TIME.format(message.at()), 8, color("938d9b")));
+        if (message.at() != null) author.add(label(" · " + MESSAGE_TIME.format(message.at()), 8, TIMESTAMP_INK));
         author.setMaximumSize(new Dimension(Integer.MAX_VALUE, author.getPreferredSize().height));
         return author;
     }
@@ -425,7 +432,7 @@ public final class ChatScreen extends JPanel {
     private void renderSpeech() {
         List<List<UiSession.Message>> messages = List.of();
         if (current != null && current.conversation != null && !current.ended) {
-            messages = current.participants().stream().limit(4)
+            messages = current.participants().stream().limit(RoomScene.MAX_VISIBLE_PARTICIPANTS)
                     .map(ChatParticipantDto::chatMemberId).map(id -> session.speech(current, id)).toList();
         }
         if (speechRoom == current && messages.equals(visibleSpeech)) {
@@ -514,15 +521,7 @@ public final class ChatScreen extends JPanel {
     }
 
     private void updateActivityIndicator() {
-        Instant now = session.now(), last = null;
-        if (current != null) {
-            for (UiSession.Message message : current.messages) {
-                if (message.at() != null && (last == null || message.at().isAfter(last))) {
-                    last = message.at();
-                }
-            }
-        }
-        activityIndicator.setActive(last != null && !last.isAfter(now) && !last.isBefore(now.minusSeconds(60)));
+        activityIndicator.setActive(session.hasRecentActivity(current));
     }
 
     /** Fill a short viewport so the history's vertical glue can bottom-align messages. */
@@ -566,9 +565,9 @@ public final class ChatScreen extends JPanel {
         @Override
         protected void paintComponent(Graphics source) {
             Graphics2D g = graphics(source);
-            g.setPaint(new GradientPaint(4, 3, color("f4efff"), 29, 29, color("a98aea")));
+            g.setPaint(new GradientPaint(4, 3, ORB_LIGHT, 29, 29, ORB_DARK));
             g.fillOval(1, 1, 30, 30);
-            g.setColor(new Color(255, 255, 255, 145));
+            g.setColor(ORB_RIM);
             g.drawOval(1, 1, 29, 29);
             g.dispose();
         }
@@ -589,13 +588,7 @@ public final class ChatScreen extends JPanel {
         }
         @Override
         protected void paintComponent(Graphics source) {
-            Graphics2D g = (Graphics2D) source.create();
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(active ? color("e7f9f3") : color("f1eef5"));
-            g.fillOval(0, 0, 13, 13);
-            g.setColor(active ? color("52d4aa") : color("aaa5b5"));
-            g.fillOval(4, 4, 5, 5);
-            g.dispose();
+            paintStatusDot(source, 13, 4, 5, active);
         }
     }
 
@@ -604,16 +597,15 @@ public final class ChatScreen extends JPanel {
             super(new FlowLayout(FlowLayout.CENTER, 6, 6));
             setOpaque(false);
             setBorder(BorderFactory.createEmptyBorder(0, 8, 0, 8));
-            JLabel lock = label("🔒", 11, color("756d82"));
+            JLabel lock = label("🔒", 11, NOTICE_INK);
             lock.setFont(UiFonts.scale(new Font("Segoe UI Emoji", Font.PLAIN, 11)));
             add(lock);
-            add(label("계정 정보는 보이지 않아요. 이 방에서는 익명으로 대화해요.", 9, color("756d82")));
+            add(label("계정 정보는 보이지 않아요. 이 방에서는 익명으로 대화해요.", 9, NOTICE_INK));
         }
         @Override
         protected void paintComponent(Graphics source) {
-            Graphics2D g = (Graphics2D) source.create();
-            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g.setColor(new Color(255, 255, 255, 224));
+            Graphics2D g = graphics(source);
+            g.setColor(INPUT_FILL);
             g.fillRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 22, 22);
             g.dispose();
             super.paintComponent(source);
