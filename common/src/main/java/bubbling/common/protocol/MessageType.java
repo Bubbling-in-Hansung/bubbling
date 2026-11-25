@@ -70,6 +70,8 @@ public enum MessageType {
     CHAT_MESSAGE,
     CHAT_HISTORY_REQUEST,
     CHAT_HISTORY,
+    CHAT_TYPING,
+    CHAT_TYPING_EVENT,
 
     // 채팅방 종료
     CHAT_END,

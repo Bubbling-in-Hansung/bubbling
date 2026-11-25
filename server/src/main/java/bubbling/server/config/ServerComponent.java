@@ -91,6 +91,7 @@ public class ServerComponent {
         registerChatRoomHandlers();
         registerChatRequestHandlers();
         registerChatMessageHandlers();
+        registerChatTypingHandlers();
         registerGameResultHandlers();
         registerSystemHandlers();
     }
@@ -283,6 +284,20 @@ public class ServerComponent {
                 MessageType.CHAT_HISTORY_REQUEST,
                 true,
                 handler::history
+        );
+    }
+
+    private void registerChatTypingHandlers() {
+        ChatTypingHandler handler = new ChatTypingHandler(
+                chatRoomService,
+                chatMemberService,
+                messageSender
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_TYPING,
+                true,
+                handler::typing
         );
     }
 
