@@ -16,6 +16,8 @@ public final class NotificationCards {
     private static final int MAIN_FRAME_EDGE = 28;
     private static final int MAXIMIZED_TOP = 86;
     private static final int GAP = 8;
+    private static final int DISPLAY_DURATION_MS = 5500;
+    private static final Color ACCENT_INFO = color("6f4cd2");
     private final JLayeredPane layer;
     private final Map<JPanel, Card> queue = new LinkedHashMap<>();
 
@@ -45,16 +47,10 @@ public final class NotificationCards {
 
     private static void enqueue(Component owner, Notice notice) {
         JRootPane root = SwingUtilities.getRootPane(owner);
-        Window active = KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow();
-        Window ownerWindow = owner instanceof Window window ? window : SwingUtilities.getWindowAncestor(owner);
+        Window target = ModalStyle.resolveOwner(owner);
         // Server responses can arrive after a dialog is disposed but before focus returns.
-        if (active instanceof JDialog dialog && dialog.isModal() && dialog.isShowing()) {
-            for (Window parent = dialog; parent != null; parent = parent.getOwner()) {
-                if (parent == ownerWindow) {
-                    root = dialog.getRootPane();
-                    break;
-                }
-            }
+        if (target instanceof JDialog dialog && dialog.isModal() && dialog.isShowing()) {
+            root = dialog.getRootPane();
         }
         if (root == null) return;
         var cards = (NotificationCards) root.getClientProperty(QUEUE_PROPERTY);
@@ -71,8 +67,8 @@ public final class NotificationCards {
     }
 
     private void addCard(Notice notice) {
-        Color tint = color(notice.error() ? "fff0f4" : "f2efff");
-        Color accent = color(notice.error() ? "a44660" : "6f4cd2");
+        Color tint = notice.error() ? DANGER_BG : SOFT;
+        Color accent = notice.error() ? DANGER_INK : ACCENT_INFO;
         JPanel current = card(Color.WHITE, 28, false);
         current.setLayout(new BorderLayout(10, 0));
         current.setBorder(BorderFactory.createEmptyBorder(13, 13, 13, 11));
@@ -87,16 +83,7 @@ public final class NotificationCards {
 
         JPanel copy = panel(new BorderLayout(0, 4));
         copy.add(title(notice.title(), 12), BorderLayout.NORTH);
-        String message = notice.message();
-        JTextArea detail = new JTextArea(message == null || message.isBlank() ? "다시 시도해 주세요." : message);
-        detail.setFont(font(11, false));
-        detail.setForeground(color("625b70"));
-        detail.setOpaque(false);
-        detail.setBorder(null);
-        detail.setEditable(false);
-        detail.setCaretColor(new Color(0, 0, 0, 0));
-        detail.setLineWrap(true);
-        detail.setWrapStyleWord(true);
+        JTextArea detail = ModalStyle.messageArea(notice.message(), 11);
         JScrollPane scroll = ModalStyle.scrollContent(detail);
         copy.add(scroll, BorderLayout.CENTER);
         current.add(copy, BorderLayout.CENTER);
@@ -109,7 +96,7 @@ public final class NotificationCards {
         trailing.add(close, BorderLayout.NORTH);
         current.add(trailing, BorderLayout.EAST);
         current.getAccessibleContext().setAccessibleName(notice.title());
-        Timer timer = new Timer(5500, event -> dismiss(current));
+        Timer timer = new Timer(DISPLAY_DURATION_MS, event -> dismiss(current));
         timer.setRepeats(false);
         queue.put(current, new Card(detail, scroll, timer));
         current.setVisible(false);

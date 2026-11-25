@@ -7,7 +7,10 @@ import java.awt.*;
 import static bubbling.client.ui.style.Styles.*;
 
 public final class RequestManagerDialog extends JDialog {
-    private final javax.swing.Timer timer = new javax.swing.Timer(500, e -> refresh());
+    private static final int REFRESH_INTERVAL_MS = 500;
+    private static final Color EMPTY_BG = color("f8f5fe"), PENDING_INK = color("7052b6"),
+            ACCEPTED_INK = color("38765e"), ACCEPTED_BG = color("eaf7f0"), CANCELLED_BG = color("f1eef4");
+    private final javax.swing.Timer timer = new javax.swing.Timer(REFRESH_INTERVAL_MS, e -> refresh());
     private String signature = "";
     private final UiSession session;
     private final JPanel rows = column();
@@ -53,9 +56,9 @@ public final class RequestManagerDialog extends JDialog {
             append(rows, requestCard(q), 10);
         }
         if (incoming.isEmpty()) {
-            JPanel empty = card(color("f8f5fe"), 24);
+            JPanel empty = card(EMPTY_BG, 24);
             empty.setLayout(new GridBagLayout());
-            JLabel message = label("받은 참여 요청이 없어요.", 12, color("736b80"));
+            JLabel message = label("받은 참여 요청이 없어요.", 12, SUBTLE);
             message.setIcon(icon("chat"));
             message.setIconTextGap(10);
             empty.add(message);
@@ -68,7 +71,7 @@ public final class RequestManagerDialog extends JDialog {
     }
 
     private JPanel requestCard(UiSession.Request request) {
-        JPanel row = card(color("fbfafd"), 24);
+        JPanel row = card(SURFACE, 24);
         row.setLayout(new BorderLayout(12, 0));
         row.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(LINE, 1, true),
                 BorderFactory.createEmptyBorder(12, 12, 12, 12)));
@@ -82,24 +85,24 @@ public final class RequestManagerDialog extends JDialog {
         JLabel name = title(request.name, 12);
         name.setToolTipText(request.name);
         text.add(name);
-        JLabel room = label(roomTitle(request), 10, color("736b80"));
+        JLabel room = label(roomTitle(request), 10, SUBTLE);
         room.setToolTipText(room.getText());
         text.add(room);
         row.add(text, BorderLayout.CENTER);
 
         JPanel actions = panel(new FlowLayout(FlowLayout.RIGHT, 6, 2));
-        JLabel state = label(status(request.status), 10, color(switch (request.status) {
-            case PENDING -> "7052b6";
-            case ACCEPTED -> "38765e";
-            case REJECTED -> "a44660";
-            case CANCELLED -> "736b80";
-        }));
-        JPanel statusBadge = card(color(switch (request.status) {
-            case PENDING -> "f2efff";
-            case ACCEPTED -> "eaf7f0";
-            case REJECTED -> "fff0f4";
-            case CANCELLED -> "f1eef4";
-        }), 18);
+        JLabel state = label(status(request.status), 10, switch (request.status) {
+            case PENDING -> PENDING_INK;
+            case ACCEPTED -> ACCEPTED_INK;
+            case REJECTED -> DANGER_INK;
+            case CANCELLED -> SUBTLE;
+        });
+        JPanel statusBadge = card(switch (request.status) {
+            case PENDING -> SOFT;
+            case ACCEPTED -> ACCEPTED_BG;
+            case REJECTED -> DANGER_BG;
+            case CANCELLED -> CANCELLED_BG;
+        }, 18);
         statusBadge.setLayout(new FlowLayout(FlowLayout.CENTER, 8, 7));
         statusBadge.add(state);
         actions.add(statusBadge);
