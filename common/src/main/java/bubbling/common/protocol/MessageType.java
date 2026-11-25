@@ -77,6 +77,7 @@ public enum MessageType {
 
     // 채팅방 캐릭터 이동
     CHAT_POSITION_REQUEST,
+    CHAT_POSITION_CHANGED,
     CHAT_POSITION_EVENT,
 
     // 시스템 오류

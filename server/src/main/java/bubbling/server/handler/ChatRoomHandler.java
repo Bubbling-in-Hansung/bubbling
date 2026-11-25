@@ -238,6 +238,13 @@ public class ChatRoomHandler {
             throw new BaseException(ChatRoomExceptionCode.INVALID_COORDINATE);
         }
 
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.CHAT_POSITION_CHANGED,
+                message.requestId(),
+                null
+        );
+        messageSender.send(connection, response);
+
         MessageEnvelope event = new MessageEnvelope(
                 MessageType.CHAT_POSITION_EVENT,
                 null,
