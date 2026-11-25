@@ -5,5 +5,6 @@ import bubbling.common.enums.GameType;
 public record GameResultRequest(
         String userId,
         int score,
-        GameType gameType
+        GameType gameType,
+        int limit
 ) {}

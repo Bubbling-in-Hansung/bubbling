@@ -10,7 +10,7 @@ import bubbling.server.exception.code.AuthExceptionCode;
 import bubbling.server.mapper.UserMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
-import bubbling.server.service.AuthService;
+import bubbling.server.service.user.AuthService;
 
 public class AuthHandler {
 

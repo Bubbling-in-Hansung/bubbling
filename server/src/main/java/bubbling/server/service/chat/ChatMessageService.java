@@ -1,4 +1,4 @@
-package bubbling.server.service;
+package bubbling.server.service.chat;
 
 import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatMessage;

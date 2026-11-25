@@ -2,7 +2,9 @@ package bubbling.server.service;
 
 import bubbling.server.domain.User;
 import bubbling.server.exception.BaseException;
-import bubbling.server.security.PasswordService;
+import bubbling.server.service.user.PasswordService;
+import bubbling.server.service.user.AuthService;
+import bubbling.server.service.user.UserService;
 import bubbling.server.store.UserStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

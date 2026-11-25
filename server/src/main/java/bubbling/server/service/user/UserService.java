@@ -1,4 +1,4 @@
-package bubbling.server.service;
+package bubbling.server.service.user;
 
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.server.domain.User;

@@ -14,9 +14,9 @@ import bubbling.server.mapper.ChatParticipantMapper;
 import bubbling.server.mapper.ChatRoomMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
-import bubbling.server.service.BubbleService;
-import bubbling.server.service.ChatMemberService;
-import bubbling.server.service.ChatRoomService;
+import bubbling.server.service.bubble.BubbleService;
+import bubbling.server.service.chat.ChatMemberService;
+import bubbling.server.service.chat.ChatRoomService;
 
 import java.util.List;
 

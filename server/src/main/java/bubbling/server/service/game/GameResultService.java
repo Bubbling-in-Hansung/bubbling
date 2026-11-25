@@ -1,4 +1,4 @@
-package bubbling.server.service;
+package bubbling.server.service.game;
 
 import bubbling.common.enums.GameType;
 import bubbling.server.domain.GameResult;

@@ -7,9 +7,16 @@ import bubbling.server.network.MessageDispatcher;
 import bubbling.server.network.MessageSender;
 import bubbling.server.notifier.OnlineStatusNotifier;
 import bubbling.server.scheduler.BubbleExpirationScheduler;
-import bubbling.server.security.PasswordService;
+import bubbling.server.service.bubble.BubbleReactionService;
+import bubbling.server.service.bubble.BubbleService;
+import bubbling.server.service.chat.ChatMemberService;
+import bubbling.server.service.chat.ChatMessageService;
+import bubbling.server.service.chat.ChatRequestService;
+import bubbling.server.service.chat.ChatRoomService;
+import bubbling.server.service.user.PasswordService;
 import bubbling.server.seed.SeedBootstrap;
-import bubbling.server.service.*;
+import bubbling.server.service.user.AuthService;
+import bubbling.server.service.user.UserService;
 import bubbling.server.store.*;
 
 public class ServerComponent {

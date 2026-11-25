@@ -2,7 +2,7 @@ package bubbling.server.seed;
 
 import bubbling.common.codec.JsonCodec;
 import bubbling.server.domain.User;
-import bubbling.server.service.UserService;
+import bubbling.server.service.user.UserService;
 
 import java.io.IOException;
 import java.io.InputStream;
