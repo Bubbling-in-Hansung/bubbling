@@ -1,0 +1,88 @@
+[
+  {
+    "bubbleKey": "bubble-01",
+    "participants": ["testuser8", "testuser9"],
+    "messages": [
+      {
+        "senderLoginId": "testuser1",
+        "content": "진로를 어떻게 정해야 할지 고민이에요."
+      },
+      {
+        "senderLoginId": "testuser8",
+        "content": "어떤 분야에 관심이 있으세요?"
+      },
+      {
+        "senderLoginId": "testuser1",
+        "content": "개발과 디자인 사이에서 고민하고 있어요."
+      },
+      {
+        "senderLoginId": "testuser9",
+        "content": "두 분야를 함께 활용할 수 있는 직무도 알아보세요."
+      }
+    ],
+    "ended": false
+  },
+  {
+    "bubbleKey": "bubble-02",
+    "participants": ["testuser10"],
+    "messages": [
+      {
+        "senderLoginId": "testuser2",
+        "content": "오늘 정말 속상한 일이 있었어요."
+      },
+      {
+        "senderLoginId": "testuser10",
+        "content": "무슨 일이 있었는지 편하게 말씀해 주세요."
+      },
+      {
+        "senderLoginId": "testuser2",
+        "content": "친구와 사소한 일로 다퉜어요."
+      }
+    ],
+    "ended": false
+  },
+  {
+    "bubbleKey": "bubble-03",
+    "participants": ["testuser8"],
+    "messages": [
+      {
+        "senderLoginId": "testuser3",
+        "content": "취업 준비가 생각보다 쉽지 않네요."
+      },
+      {
+        "senderLoginId": "testuser8",
+        "content": "저도 비슷한 경험이 있어요."
+      },
+      {
+        "senderLoginId": "testuser3",
+        "content": "면접 준비는 어떻게 하셨나요?"
+      }
+    ],
+    "ended": false
+  },
+  {
+    "bubbleKey": "bubble-04",
+    "participants": ["testuser5"],
+    "messages": [
+      {
+        "senderLoginId": "testuser4",
+        "content": "오늘은 그냥 누군가와 이야기하고 싶었어요."
+      },
+      {
+        "senderLoginId": "testuser5",
+        "content": "저도 대화할 사람이 필요했어요."
+      },
+      {
+        "senderLoginId": "testuser4",
+        "content": "이야기 들어주셔서 감사합니다."
+      }
+    ],
+    "ended": true
+  },
+  {
+    "bubbleKey": "bubble-06",
+    "participants": [],
+    "messages": [],
+    "ended": false
+  }
+]

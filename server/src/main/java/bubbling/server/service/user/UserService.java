@@ -1,4 +1,4 @@
-package bubbling.server.service;
+package bubbling.server.service.user;
 
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.server.domain.User;
@@ -26,7 +26,7 @@ public class UserService {
                 loginId,
                 passwordHash,
                 nickname,
-                ProfileCharacter.EXAMPLE
+                ProfileCharacter.BUNNY
         );
 
         return store.save(user);

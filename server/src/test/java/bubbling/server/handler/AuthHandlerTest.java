@@ -7,7 +7,7 @@ import bubbling.common.protocol.*;
 import bubbling.server.domain.User;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
-import bubbling.server.service.AuthService;
+import bubbling.server.service.user.AuthService;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

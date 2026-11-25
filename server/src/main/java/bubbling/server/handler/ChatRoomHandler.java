@@ -8,13 +8,15 @@ import bubbling.server.domain.Bubble;
 import bubbling.server.domain.ChatMember;
 import bubbling.server.domain.ChatRoom;
 import bubbling.server.domain.User;
+import bubbling.server.exception.BaseException;
+import bubbling.server.exception.code.ChatRoomExceptionCode;
 import bubbling.server.mapper.ChatParticipantMapper;
 import bubbling.server.mapper.ChatRoomMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
-import bubbling.server.service.BubbleService;
-import bubbling.server.service.ChatMemberService;
-import bubbling.server.service.ChatRoomService;
+import bubbling.server.service.bubble.BubbleService;
+import bubbling.server.service.chat.ChatMemberService;
+import bubbling.server.service.chat.ChatRoomService;
 
 import java.util.List;
 
@@ -211,5 +213,48 @@ public class ChatRoomHandler {
                 jsonCodec.toPayload(payload)
         );
         messageSender.send(connection, response);
+    }
+
+    public void position(ClientConnection connection, MessageEnvelope message) {
+        ChatPositionDto dto = jsonCodec.fromPayload(
+                message.payload(),
+                ChatPositionDto.class
+        );
+
+        User user = connection.requireAuthenticatedUser();
+
+        ChatRoom chatRoom = chatRoomService.findById(dto.chatRoomId());
+        if(!chatRoom.isActive()) {
+            throw new BaseException(ChatRoomExceptionCode.ENDED);
+        }
+
+        ChatMember chatMember = chatMemberService.findByChatRoomAndUserAndIsActive(chatRoom, user);
+
+        if (!chatMember.getId().equals(dto.chatMemberId())) {
+            throw new BaseException(ChatRoomExceptionCode.NOT_JOINED);
+        }
+
+        if (!Double.isFinite(dto.x()) || !Double.isFinite(dto.y())) {
+            throw new BaseException(ChatRoomExceptionCode.INVALID_COORDINATE);
+        }
+
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.CHAT_POSITION_CHANGED,
+                message.requestId(),
+                null
+        );
+        messageSender.send(connection, response);
+
+        MessageEnvelope event = new MessageEnvelope(
+                MessageType.CHAT_POSITION_EVENT,
+                null,
+                message.payload()
+        );
+        List<User> users = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom)
+                .stream()
+                .map(ChatMember::getUser)
+                .filter(u -> !u.equals(user))
+                .toList();
+        messageSender.sendAllTarget(users, event);
     }
 }

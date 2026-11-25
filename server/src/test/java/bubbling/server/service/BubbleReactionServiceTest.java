@@ -1,5 +1,6 @@
 package bubbling.server.service;
 
+import bubbling.server.service.bubble.BubbleReactionService;
 import bubbling.server.store.BubbleReactionStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

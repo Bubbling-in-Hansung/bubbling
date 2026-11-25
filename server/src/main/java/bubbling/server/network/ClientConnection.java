@@ -153,6 +153,15 @@ public class ClientConnection implements Runnable {
         return authenticatedUser;
     }
 
+    public void logout() {
+        synchronized (clientRegistry) {
+            requireAuthenticatedUser();
+            this.user = null;
+        }
+
+        clientRegistry.notifyOnlineStatusChanged();
+    }
+
     public void close() {
         if (!closed.compareAndSet(false, true)) {
             return;
