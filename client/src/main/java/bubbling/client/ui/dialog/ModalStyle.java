@@ -10,6 +10,9 @@ import static bubbling.client.ui.style.Styles.*;
 
 /** Temporary owner scrim; restores the previous glass pane and keyboard focus. */
 final class ModalStyle {
+    private static final Color DANGER_HOVER_BG = color("f9dce5"), THUMB_HOVER = color("a990dc"),
+            THUMB_IDLE = color("d8cbed"), SCRIM_COLOR = new Color(25, 20, 45, 75),
+            TRANSPARENT = new Color(0, 0, 0, 0);
     private ModalStyle() {
     }
 
@@ -30,7 +33,7 @@ final class ModalStyle {
         JPanel copy = column();
         append(copy, title(heading, 19), description == null ? 0 : 6);
         if (description != null) {
-            append(copy, label(description, 11, color("736b80")), 0);
+            append(copy, label(description, 11, SUBTLE), 0);
         }
         header.add(copy);
         JPanel corner = panel(new BorderLayout());
@@ -53,10 +56,35 @@ final class ModalStyle {
     static JButton danger(String text, Runnable task) {
         JButton control = action(text, false, task);
         control.putClientProperty("soft", true);
-        control.putClientProperty("softHover", color("f9dce5"));
-        control.setBackground(color("fff0f4"));
-        control.setForeground(color("a44660"));
+        control.putClientProperty("softHover", DANGER_HOVER_BG);
+        control.setBackground(DANGER_BG);
+        control.setForeground(DANGER_INK);
         return control;
+    }
+
+    static JTextArea messageArea(String message, int fontSize) {
+        JTextArea area = new JTextArea(message == null || message.isBlank() ? "다시 시도해 주세요." : message);
+        area.setFont(font(fontSize, false));
+        area.setForeground(COPY);
+        area.setOpaque(false);
+        area.setBorder(null);
+        area.setEditable(false);
+        area.setCaretColor(TRANSPARENT);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        return area;
+    }
+
+    static Window resolveOwner(Component source) {
+        Window owner = source instanceof Window window ? window
+                : source == null ? null : SwingUtilities.getWindowAncestor(source);
+        Window active = KeyboardFocusManager.getCurrentKeyboardFocusManager().getActiveWindow();
+        for (Window window = active; window != null; window = window.getOwner()) {
+            if (window == owner) {
+                return active;
+            }
+        }
+        return owner;
     }
 
     static JScrollPane scrollContent(JComponent content) {
@@ -75,7 +103,7 @@ final class ModalStyle {
             protected void paintThumb(Graphics source, JComponent component, Rectangle bounds) {
                 if (bounds.isEmpty() || !component.isEnabled()) return;
                 Graphics2D g = graphics(source);
-                g.setColor(color(isThumbRollover() ? "a990dc" : "d8cbed"));
+                g.setColor(isThumbRollover() ? THUMB_HOVER : THUMB_IDLE);
                 g.fillRoundRect(bounds.x + 2, bounds.y, Math.max(1, bounds.width - 4), bounds.height, 6, 6);
                 g.dispose();
             }
@@ -116,7 +144,7 @@ final class ModalStyle {
         Component focus = KeyboardFocusManager.getCurrentKeyboardFocusManager().getFocusOwner();
         JComponent scrim = new JComponent() {
             protected void paintComponent(Graphics g) {
-                g.setColor(new Color(25, 20, 45, 75));
+                g.setColor(SCRIM_COLOR);
                 g.fillRect(0, 0, getWidth(), getHeight());
             }
         };

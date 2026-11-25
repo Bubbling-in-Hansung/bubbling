@@ -13,12 +13,15 @@ import static bubbling.client.ui.style.Styles.*;
 
 /** Native Java2D translation of world-sky/world-floor and CSS furniture. */
 public final class RoomScene extends JComponent {
+    public static final int MAX_VISIBLE_PARTICIPANTS = 4;
     private static final BufferedImage BACKGROUND = loadBackground();
     private static final double CHARACTER_SCALE = 1.3;
-    private static final int CHARACTER_WIDTH = (int) Math.ceil(72 * CHARACTER_SCALE);
-    private static final int CHARACTER_HEIGHT = (int) Math.ceil(95 * CHARACTER_SCALE);
+    private static final int CHARACTER_WIDTH = (int) Math.ceil(CharacterArt.BASE_WIDTH * CHARACTER_SCALE);
+    private static final int CHARACTER_HEIGHT = (int) Math.ceil(CharacterArt.BASE_HEIGHT * CHARACTER_SCALE);
     private static final int NAME_WIDTH = 96;
     private static final int FIGURE_HEIGHT = CHARACTER_HEIGHT + 25;
+    private static final Color FALLBACK_BG = color("e6f4f7"), EMPTY_HINT_INK = color("5e5871"),
+            NAME_PILL_BG = new Color(255, 255, 255, 220);
     private List<ChatParticipantDto> participants = List.of();
     private String myMemberId;
     private Point2D.Double ownPosition;
@@ -61,7 +64,7 @@ public final class RoomScene extends JComponent {
             case 3 -> new Point((int) (w * .60), floor + (int) (roomHeight * .23) - 60);
             default -> throw new IllegalArgumentException("Unknown participant: " + participant);
         };
-        head.y = Math.max(0, head.y - (CHARACTER_HEIGHT - 95));
+        head.y = Math.max(0, head.y - (CHARACTER_HEIGHT - CharacterArt.BASE_HEIGHT));
         return head;
     }
 
@@ -77,13 +80,13 @@ public final class RoomScene extends JComponent {
             int drawW = (int) Math.ceil(BACKGROUND.getWidth() * scale), drawH = (int) Math.ceil(BACKGROUND.getHeight() * scale);
             g.drawImage(BACKGROUND, (w - drawW) / 2, (h - drawH) / 2, drawW, drawH, null);
         } else {
-            g.setColor(color("e6f4f7"));
+            g.setColor(FALLBACK_BG);
             g.fillRect(0, 0, w, h);
         }
         if (participants.isEmpty()) {
-            centered(g, "대화에 참여하면 캐릭터가 표시돼요", w / 2, h - 25, 11, color("5e5871"));
+            centered(g, "대화에 참여하면 캐릭터가 표시돼요", w / 2, h - 25, 11, EMPTY_HINT_INK);
         } else {
-            for (int i = 0; i < Math.min(4, participants.size()); i++) {
+            for (int i = 0; i < Math.min(MAX_VISIBLE_PARTICIPANTS, participants.size()); i++) {
                 ChatParticipantDto participant = participants.get(i);
                 Point head = participantHead(i);
                 String name = participant.nickname();
@@ -107,7 +110,7 @@ public final class RoomScene extends JComponent {
     private void person(Graphics2D g, int x, int y, int index, String name) {
         CharacterArt.paint(g, x - CHARACTER_WIDTH / 2, y, CHARACTER_SCALE, index);
         int labelY = y + CHARACTER_HEIGHT + 3;
-        g.setColor(new Color(255, 255, 255, 220));
+        g.setColor(NAME_PILL_BG);
         g.fillRoundRect(x - NAME_WIDTH / 2, labelY, NAME_WIDTH, 22, 12, 12);
         centered(g, name, x, labelY + 15, 8, INK);
     }

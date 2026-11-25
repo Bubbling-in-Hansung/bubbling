@@ -1,13 +1,13 @@
 package bubbling.client.ui.screen;
 
 import bubbling.client.ui.drawing.BubbleArt;
+import bubbling.client.ui.model.MessageText;
 import bubbling.client.ui.model.RoomView;
 import bubbling.client.ui.style.UiFonts;
 import javax.swing.*;
 import java.awt.*;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import static bubbling.client.ui.style.Styles.*;
 
@@ -15,8 +15,11 @@ import static bubbling.client.ui.style.Styles.*;
 final class RoomDetailPanel extends JPanel {
     private static final int ORB_SIZE = 180;
     private static final int ORB_PADDING = 16;
-    private final JLabel category = badge("", color("f1edff"), color("7052cb"));
-    private final JLabel privacy = badge("", color("edf8f7"), color("418e7e"));
+    private static final Color CATEGORY_BG = color("f1edff"), CATEGORY_INK = color("7052cb"),
+            PRIVACY_BG = color("edf8f7"), PRIVACY_INK = color("418e7e"), VALUE_INK = color("585165"),
+            ROW_SEPARATOR = color("f0edf5");
+    private final JLabel category = badge("", CATEGORY_BG, CATEGORY_INK);
+    private final JLabel privacy = badge("", PRIVACY_BG, PRIVACY_INK);
     private final JLabel mode = valueLabel();
     private final JLabel remaining = valueLabel();
     private final JLabel people = valueLabel();
@@ -109,7 +112,7 @@ final class RoomDetailPanel extends JPanel {
     }
 
     private static JLabel valueLabel() {
-        JLabel value = label("", 11, color("585165"));
+        JLabel value = label("", 11, VALUE_INK);
         value.setFont(UiFonts.body(11, 600));
         return value;
     }
@@ -117,7 +120,7 @@ final class RoomDetailPanel extends JPanel {
     private static JPanel informationRow(String name, JLabel value, boolean separator) {
         JPanel row = panel(new BorderLayout(8, 0));
         row.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(separator ? 1 : 0, 0, 0, 0, color("f0edf5")),
+                BorderFactory.createMatteBorder(separator ? 1 : 0, 0, 0, 0, ROW_SEPARATOR),
                 BorderFactory.createEmptyBorder(0, 16, 0, 16)));
         row.add(label(name, 11, MUTED), BorderLayout.WEST);
         row.add(value, BorderLayout.EAST);
@@ -200,27 +203,8 @@ final class RoomDetailPanel extends JPanel {
 
         private List<String> lines() {
             FontMetrics metrics = getFontMetrics(getFont());
-            List<String> result = new ArrayList<>();
-            StringBuilder line = new StringBuilder();
-            for (int codePoint : text.codePoints().toArray()) {
-                String next = new String(Character.toChars(codePoint));
-                if (!line.isEmpty() && metrics.stringWidth(line + next) > WIDTH) {
-                    result.add(line.toString());
-                    line.setLength(0);
-                }
-                line.append(next);
-            }
-            result.add(line.toString());
             int maxLines = Math.max(1, MAX_HEIGHT / metrics.getHeight());
-            if (result.size() > maxLines) {
-                result.subList(maxLines, result.size()).clear();
-                String last = result.getLast();
-                while (!last.isEmpty() && metrics.stringWidth(last + "…") > WIDTH) {
-                    last = last.substring(0, last.offsetByCodePoints(last.length(), -1));
-                }
-                result.set(maxLines - 1, last + "…");
-            }
-            return result;
+            return MessageText.wrapWithEllipsis(text, metrics::stringWidth, WIDTH, maxLines);
         }
 
         @Override

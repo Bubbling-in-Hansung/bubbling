@@ -15,6 +15,7 @@ public final class RoomEditor extends JDialog {
     private static final int DEFAULT_MINUTES = 30;
     private static final List<Integer> EXPIRY_MINUTES = List.of(10, 20, 30, 60);
     private static final List<Integer> CAPACITIES = List.of(2, 3, 4);
+    private static final Color FIELD_LABEL = color("575164"), INPUT_INK = color("484252");
 
     public RoomEditor(Window owner, RoomView initial, UiSession session, Runnable changed) {
         super(owner, initial == null ? "새 비눗방울 띄우기" : "비눗방울 수정", ModalityType.APPLICATION_MODAL);
@@ -108,7 +109,7 @@ public final class RoomEditor extends JDialog {
 
     private static JPanel field(String caption, JComponent input) {
         JPanel field = column();
-        JLabel name = label(caption, 10, color("575164"));
+        JLabel name = label(caption, 10, FIELD_LABEL);
         name.setFont(font(10, true));
         name.setLabelFor(input);
         append(field, name, 7);
@@ -119,8 +120,8 @@ public final class RoomEditor extends JDialog {
 
     private static void styleInput(JComponent component) {
         component.setFont(font(10, false));
-        component.setForeground(color("484252"));
-        component.setBackground(color("fbfafd"));
+        component.setForeground(INPUT_INK);
+        component.setBackground(SURFACE);
         component.putClientProperty("FlatLaf.style", "arc: 10; borderColor: #e7e2ef");
         component.setPreferredSize(new Dimension(0, 40));
         component.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
