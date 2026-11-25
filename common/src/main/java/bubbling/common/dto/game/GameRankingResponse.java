@@ -1,9 +1,12 @@
 package bubbling.common.dto.game;
 
-import bubbling.common.dto.user.UserDto;
+import bubbling.common.enums.GameRankingType;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 public record GameRankingResponse(
-        int rank,
-        UserDto user,
-        int score
+        GameRankingType rankingType,
+        List<GameRankingData> rankings, // always descending order
+        LocalDateTime aggregateAt
 ) {}

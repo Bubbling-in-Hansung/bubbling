@@ -5,7 +5,7 @@ import bubbling.server.exception.ExceptionCode;
 public enum GameExceptionCode implements ExceptionCode {
     NEGATIVE_SCORE("GAME_001", "게임 점수는 음수가 될 수 없습니다."),
     NOT_FOUND("GAME_002", "게임 결과를 찾을 수 없습니다."),
-    ;
+    INVALID_SEARCH_CONDITION("GAME_003", "랭킹 조회 조건이 잘못되었습니다.");
 
     private final String code;
     private final String message;

@@ -80,6 +80,12 @@ public enum MessageType {
     CHAT_POSITION_CHANGED,
     CHAT_POSITION_EVENT,
 
+    // 게임
+    GAME_RESULT_REQUEST,
+    GAME_RESULT_SAVED,
+    GAME_RANKING_REQUEST,
+    GAME_RANKING,
+
     // 시스템 오류
     ERROR
 }
