@@ -209,6 +209,12 @@ public class ServerComponent {
                 true,
                 handler::list
         );
+
+        messageDispatcher.register(
+                MessageType.CHAT_POSITION_REQUEST,
+                true,
+                handler::position
+        );
     }
 
     private void registerChatRequestHandlers() {
