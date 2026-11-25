@@ -179,6 +179,11 @@ public final class UiSession {
     }
 
     public void markEnded(ChatEndResponse response) {
+        for (Request request : requests) {
+            if (request.roomId.equals(response.bubbleId()) && request.status == ChatRequestStatus.PENDING) {
+                request.status = ChatRequestStatus.CANCELLED;
+            }
+        }
         Room room = chatRoom(response.chatRoomId());
         if (room == null) return;
         room.ended = true;
@@ -233,6 +238,37 @@ public final class UiSession {
             request.status = response.status();
         }
         return added;
+    }
+
+    public int applyRequestList(ChatRequestDto[] list) {
+        if (list == null) return 0;
+        int addedIncomingPending = 0;
+        for (ChatRequestDto dto : list) {
+            if (dto == null || dto.chatRequestId() == null) continue;
+            var existing = requests.stream()
+                    .filter(item -> item.id.equals(dto.chatRequestId()))
+                    .findFirst()
+                    .orElse(null);
+            if (existing != null) {
+                if (existing.status == ChatRequestStatus.PENDING && dto.status() != null) {
+                    if (dto.status() == ChatRequestStatus.REJECTED) {
+                        reject(existing);
+                    } else {
+                        existing.status = dto.status();
+                    }
+                }
+                continue;
+            }
+            Room targetRoom = rooms.get(dto.bubbleId());
+            if (targetRoom != null && (targetRoom.ended || targetRoom.removed)) {
+                continue;
+            }
+            if (applyRequest(dto) && dto.role() == ChatRequestRole.OWNER
+                    && dto.status() == ChatRequestStatus.PENDING) {
+                addedIncomingPending++;
+            }
+        }
+        return addedIncomingPending;
     }
 
     public void applyHistory(String roomId, ChatMessageDto[] history) {
@@ -355,6 +391,10 @@ public final class UiSession {
             return;
         }
         liveRequests.requestChat(r.bubbleId);
+    }
+
+    public void requestIncomingRequests() {
+        liveRequests.requestChatRequests();
     }
 
     public void decide(Request q, boolean accept) {

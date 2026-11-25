@@ -241,6 +241,7 @@ public final class HomeScreen extends JPanel {
     }
 
     private void openRequestManager() {
+        session.requestIncomingRequests();
         RequestManagerDialog dialog = new RequestManagerDialog(SwingUtilities.getWindowAncestor(this),
                 session, this::refresh);
         requestsOpened.run();

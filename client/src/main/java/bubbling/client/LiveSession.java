@@ -57,6 +57,7 @@ public final class LiveSession {
     private boolean connected;
     private boolean closed;
     private String authId;
+    private String logoutId;
     private MessageType authResult;
     private String opening;
 
@@ -88,6 +89,16 @@ public final class LiveSession {
             signedIn(dispatcher.decode(message, RegisterResponse.class).user());
         });
         onAuthenticated(dispatcher, PASSWORD_CHANGED, message -> view.passwordChanged());
+        on(dispatcher, LOGOUT_RESULT, message -> {
+            if (logoutId == null || !logoutId.equals(message.requestId())) return;
+            logoutId = null;
+            user = null;
+            opening = null;
+            historyRequests.clear();
+            leaveRequests.clear();
+            view.resetLiveState();
+            finishAuthentication("");
+        });
         on(dispatcher, ERROR, message -> {
             ExceptionResponse response = dispatcher.decodeError(message);
             String detail = response.message() == null ? "서버에서 요청을 처리하지 못했습니다." : response.message();
@@ -171,6 +182,13 @@ public final class LiveSession {
                 view.refreshLiveState();
             });
         }
+        onAuthenticated(dispatcher, CHAT_REQUEST_LIST, ChatRequestDto[].class, list -> {
+            int added = state.applyRequestList(list);
+            if (added > 0) {
+                view.requestsLoaded(added);
+            }
+            view.refreshLiveState();
+        });
         onAuthenticated(dispatcher, CHAT_HISTORY, message -> {
             String roomId = historyRequests.remove(message.requestId());
             if (roomId == null) return;
@@ -223,6 +241,7 @@ public final class LiveSession {
     public void disconnected(String detail) {
         connected = false;
         user = null;
+        logoutId = null;
         opening = null;
         historyRequests.clear();
         leaveRequests.clear();
@@ -275,7 +294,14 @@ public final class LiveSession {
         user = Objects.requireNonNull(account);
         finishAuthentication("");
         view.signedIn(user);
+        send(CHAT_REQUEST_LIST_REQUEST, null);
         refreshRooms();
+    }
+
+    public void logout() {
+        if (!connected || user == null || logoutId != null) return;
+        logoutId = UUID.randomUUID().toString();
+        transmit(LOGOUT, logoutId, null);
     }
 
     private void applyAccount(UserDto account) {
@@ -319,11 +345,13 @@ public final class LiveSession {
     public void close() {
         closed = true;
         connected = false;
+        logoutId = null;
         leaveRequests.clear();
         authenticationTimeout.stop();
     }
 
     private void clearFailedRequest(MessageEnvelope message) {
+        if (logoutId != null && logoutId.equals(message.requestId())) logoutId = null;
         if (opening != null && opening.equals(message.requestId())) opening = null;
         historyRequests.remove(message.requestId());
         leaveRequests.remove(message.requestId());

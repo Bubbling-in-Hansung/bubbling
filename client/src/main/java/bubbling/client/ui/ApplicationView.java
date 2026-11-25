@@ -10,7 +10,6 @@ import bubbling.client.ui.style.UiFonts;
 import static bubbling.client.ui.model.UiPages.*;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.WindowEvent;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -233,23 +232,16 @@ public final class ApplicationView extends JPanel {
         profile.getAccessibleContext().setAccessibleName("마이페이지");
         append(bottom, profile, 8);
         profile.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JButton logout = button("", false, this::leaveApplication);
+        JButton logout = button("", false, live::logout);
         logout.setIcon(icon("logout"));
         logout.putClientProperty("flat", true);
-        String logoutLabel = "로그아웃 및 종료";
+        String logoutLabel = "로그아웃";
         logout.setToolTipText(logoutLabel);
         logout.getAccessibleContext().setAccessibleName(logoutLabel);
         append(bottom, logout, 5);
         logout.setAlignmentX(Component.CENTER_ALIGNMENT);
         sidebar.add(bottom, BorderLayout.SOUTH);
         return sidebar;
-    }
-
-    private void leaveApplication() {
-        Window window = SwingUtilities.getWindowAncestor(this);
-        if (window != null) {
-            window.dispatchEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING));
-        }
     }
 
     public void showPage(String page) {
@@ -344,6 +336,12 @@ public final class ApplicationView extends JPanel {
                 g.dispose();
             }
         };
+    }
+
+    public void requestsLoaded(int count) {
+        if (count <= 0) return;
+        unreadIncomingRequests += count;
+        updateIncomingRequestBadge();
     }
 
     public void requestReceived(String bubbleId) {

@@ -76,6 +76,10 @@ public final class SessionRequests {
         send.accept(PASSWORD_CHANGE_REQUEST, new PasswordChangeRequest(currentPassword, newPassword));
     }
 
+    public void requestChatRequests() {
+        send.accept(CHAT_REQUEST_LIST_REQUEST, null);
+    }
+
     private static BubbleCategory category(RoomView room) {
         return Arrays.stream(BubbleCategory.values()).filter(value -> value.getLabel().equals(room.category()))
                 .findFirst().orElseThrow();
