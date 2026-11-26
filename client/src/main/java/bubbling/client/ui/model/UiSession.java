@@ -291,8 +291,9 @@ public final class UiSession {
         return room;
     }
 
-    private Room chatRoom(String chatId) {
-        return rooms.values().stream().filter(room -> room.conversation != null && room.conversation.chatRoomId().equals(chatId))
+    public Room chatRoom(String chatId) {
+        if (chatId == null) return null;
+        return rooms.values().stream().filter(room -> room.conversation != null && chatId.equals(room.conversation.chatRoomId()))
                 .findFirst().orElse(null);
     }
 

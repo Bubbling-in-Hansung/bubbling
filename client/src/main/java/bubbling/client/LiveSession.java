@@ -16,6 +16,7 @@ import bubbling.common.dto.chat.ChatEndResponse;
 import bubbling.common.dto.chat.ChatHistoryRequest;
 import bubbling.common.dto.chat.ChatLeaveRequest;
 import bubbling.common.dto.chat.ChatMemberCountEvent;
+import bubbling.common.dto.chat.ChatMemberEvent;
 import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestDto;
@@ -166,9 +167,15 @@ public final class LiveSession {
             view.refreshLiveState();
             refreshRooms();
         });
-        for (MessageType type : new MessageType[] {CHAT_MEMBER_JOINED, CHAT_MEMBER_LEFT}) {
-            onAuthenticated(dispatcher, type, message -> refreshRooms());
-        }
+        onAuthenticated(dispatcher, CHAT_MEMBER_JOINED, ChatMemberEvent.class, event -> {
+            UiSession.Room room = state.chatRoom(event.chatRoomId());
+            if (room != null && !room.view.privateRoom()) {
+                view.memberJoined(event.participant(), room);
+                view.refreshLiveState();
+            }
+            refreshRooms();
+        });
+        onAuthenticated(dispatcher, CHAT_MEMBER_LEFT, message -> refreshRooms());
         onAuthenticated(dispatcher, CHAT_MEMBER_COUNT_CHANGED, ChatMemberCountEvent.class, count -> {
             state.updateMemberCount(count.bubbleId(), count.currentMemberCnt());
             view.refreshLiveState();

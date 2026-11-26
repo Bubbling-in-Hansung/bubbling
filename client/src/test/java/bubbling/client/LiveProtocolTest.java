@@ -2,6 +2,7 @@ package bubbling.client;
 
 import bubbling.client.network.ClientMessageDispatcher;
 import bubbling.client.ui.ApplicationView;
+import bubbling.client.ui.dialog.NotificationCards;
 import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.model.UiData;
 import bubbling.common.codec.JsonCodec;
@@ -10,6 +11,7 @@ import bubbling.common.dto.bubble.BubbleDto;
 import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.bubble.BubbleUpdateRequest;
 import bubbling.common.dto.chat.ChatEndResponse;
+import bubbling.common.dto.chat.ChatMemberEvent;
 import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.common.dto.chat.ChatParticipantDto;
 import bubbling.common.dto.chat.ChatPositionDto;
@@ -28,6 +30,8 @@ import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageEnvelope;
 import org.junit.jupiter.api.Test;
 
+import javax.swing.JButton;
+import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Container;
@@ -324,6 +328,91 @@ class LiveProtocolTest {
             assertEquals(370, scene.participantHead(1).y);
             live.close();
         });
+    }
+
+    @Test
+    void notifiesAndIncrementsChatBadgeWhenMemberJoinsOpenRoom() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+        var root = new AtomicReference<JRootPane>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            var pane = new JRootPane();
+            var view = new ApplicationView(data, live);
+            pane.setSize(1200, 800);
+            pane.setContentPane(view);
+            root.set(pane);
+            application.set(view);
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+
+            var openBubble = new BubbleDto("open", "공개 고민", BubbleCategory.DAILY, BubbleMethod.TOGETHER,
+                    4, 1, true, BubbleStatus.ALIVE, 0, "2026-11-23T00:00:00", "2099-01-01T00:00:00");
+            var privateBubble = bubble("private");
+            dispatcher.dispatch(new MessageEnvelope(MY_CHAT_ROOM_LIST, "list",
+                    codec.toPayload(List.of(chat(openBubble, true), chat(privateBubble, true)))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MEMBER_JOINED, null, codec.toPayload(
+                    new ChatMemberEvent("chat-open",
+                            new ChatParticipantDto("member-2", "말랑한 토끼", ProfileCharacter.BUNNY)))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            JButton chatButton = findButton(application.get(), "채팅");
+            assertNotNull(chatButton);
+            assertEquals("채팅, 확인하지 않은 알림 1건", chatButton.getAccessibleContext().getAccessibleName());
+            assertNotNull(findByAccessibleName(root.get().getLayeredPane(), "새 참여자가 들어왔어요"));
+
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MEMBER_JOINED, null, codec.toPayload(
+                    new ChatMemberEvent("chat-open",
+                            new ChatParticipantDto("member-2", "말랑한 토끼", ProfileCharacter.BUNNY)))));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MEMBER_JOINED, null, codec.toPayload(
+                    new ChatMemberEvent("chat-open",
+                            new ChatParticipantDto("member-3", "포근한 여우", ProfileCharacter.FOX)))));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MEMBER_JOINED, null, codec.toPayload(
+                    new ChatMemberEvent("chat-private",
+                            new ChatParticipantDto("member-4", "졸린 펭귄", ProfileCharacter.PENGUIN)))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            JButton chatButton = findButton(application.get(), "채팅");
+            assertNotNull(chatButton);
+            assertEquals("채팅, 확인하지 않은 알림 2건", chatButton.getAccessibleContext().getAccessibleName());
+
+            application.get().showPage("conversations");
+            assertEquals("채팅", chatButton.getAccessibleContext().getAccessibleName());
+            NotificationCards.clear(application.get());
+            live.close();
+        });
+    }
+
+    private static JButton findButton(Container root, String text) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JButton button && text.equals(button.getText())) return button;
+            if (child instanceof Container nested) {
+                JButton found = findButton(nested, text);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static Component findByAccessibleName(Container root, String name) {
+        for (Component child : root.getComponents()) {
+            if (name.equals(child.getAccessibleContext().getAccessibleName())) return child;
+            if (child instanceof Container nested) {
+                Component found = findByAccessibleName(nested, name);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private static <T extends Component> T findComponent(Container root, Class<T> type) {

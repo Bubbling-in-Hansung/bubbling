@@ -2,6 +2,7 @@ package bubbling.client.ui;
 
 import bubbling.client.LiveSession;
 import bubbling.client.ui.dialog.NotificationCards;
+import bubbling.common.dto.chat.ChatParticipantDto;
 import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.user.UserDto;
 import bubbling.client.ui.model.*;
@@ -35,10 +36,10 @@ public final class ApplicationView extends JPanel {
     private final JPanel shellDeck = new JPanel(shellPages);
     private String currentPage = "";
     private JButton homeButton, chatButton;
-    private final Set<String> seenApprovals = new HashSet<>();
-    private final Set<String> unopenedApprovedRooms = new HashSet<>();
+    private final Set<String> seenMemberEvents = new HashSet<>();
+    private final Map<String, String> unopenedRoomNotices = new HashMap<>();
+    private final Map<String, Integer> unreadNoticesByRoom = new HashMap<>();
     private final Map<String, Integer> unreadMessagesByRoom = new HashMap<>();
-    private int unreadApprovals;
     private int unreadIncomingRequests;
     private final UiData data;
     private final LiveSession live;
@@ -260,7 +261,7 @@ public final class ApplicationView extends JPanel {
             home.onEnter();
         }
         if (page.equals(CONVERSATIONS)) {
-            unreadApprovals = 0;
+            unreadNoticesByRoom.clear();
             updateChatBadge();
             conversations.onEnter();
             if (changedPage) {
@@ -355,12 +356,27 @@ public final class ApplicationView extends JPanel {
     }
 
     public void requestApproved(String approvalId, UiSession.Room room) {
-        if (!seenApprovals.add(approvalId)) return;
-        unopenedApprovedRooms.add(approvalRoomId(room));
-        unreadApprovals++;
-        updateChatBadge();
-        NotificationCards.info(this, "참여 요청이 수락됐어요",
+        recordChatNotice(approvalId, room, "새로 수락된 참여 요청", "참여 요청이 수락됐어요",
                 "‘" + room.view.title() + "’ 대화를 채팅 목록에서 열 수 있어요.");
+    }
+
+    public void memberJoined(ChatParticipantDto participant, UiSession.Room room) {
+        if (participant == null || room == null || room.view.privateRoom()) return;
+        String detail = participant.nickname() == null || participant.nickname().isBlank()
+                ? "‘" + room.view.title() + "’ 대화에 새 참여자가 들어왔어요."
+                : "‘" + room.view.title() + "’ 대화에 " + participant.nickname() + "님이 들어왔어요.";
+        recordChatNotice(participant.chatMemberId(), room, "새 참여자 입장", "새 참여자가 들어왔어요", detail);
+    }
+
+    private void recordChatNotice(String eventId, UiSession.Room room, String rowNotice,
+            String title, String detail) {
+        if (eventId != null && !seenMemberEvents.add(eventId)) return;
+        if (!(currentPage.equals(CHAT) && chat.isShowingRoom(room.id))) {
+            unopenedRoomNotices.put(approvalRoomId(room), rowNotice);
+            unreadNoticesByRoom.merge(room.id, 1, Integer::sum);
+            updateChatBadge();
+        }
+        NotificationCards.info(this, title, detail);
     }
 
     private static String approvalRoomId(UiSession.Room room) {
@@ -374,15 +390,16 @@ public final class ApplicationView extends JPanel {
     }
 
     private String roomNotificationDescription(UiSession.Room room) {
-        boolean hasApproval = unopenedApprovedRooms.contains(approvalRoomId(room));
+        String roomNotice = unopenedRoomNotices.get(approvalRoomId(room));
         Integer unreadMessages = unreadMessagesByRoom.get(room.id);
-        if (unreadMessages == null) return hasApproval ? "새로 수락된 참여 요청" : null;
+        if (unreadMessages == null) return roomNotice;
         String description = "읽지 않은 메시지 " + unreadMessages + "건";
-        return hasApproval ? "새로 수락된 참여 요청, " + description : description;
+        return roomNotice == null ? description : roomNotice + ", " + description;
     }
 
     private int chatBadgeCount() {
-        return unreadApprovals + unreadMessagesByRoom.values().stream().mapToInt(Integer::intValue).sum();
+        return unreadNoticesByRoom.values().stream().mapToInt(Integer::intValue).sum()
+                + unreadMessagesByRoom.values().stream().mapToInt(Integer::intValue).sum();
     }
 
     private void updateChatBadge() {
@@ -421,7 +438,8 @@ public final class ApplicationView extends JPanel {
     public void openLiveChat(UiSession.Room room) {
         data.session().visit(room);
         chat.showRoom(room.view);
-        unopenedApprovedRooms.remove(approvalRoomId(room));
+        unopenedRoomNotices.remove(approvalRoomId(room));
+        unreadNoticesByRoom.remove(room.id);
         unreadMessagesByRoom.remove(room.id);
         updateChatBadge();
         showPage(CHAT);
@@ -446,10 +464,10 @@ public final class ApplicationView extends JPanel {
     }
 
     public void resetLiveState() {
-        seenApprovals.clear();
-        unopenedApprovedRooms.clear();
+        seenMemberEvents.clear();
+        unopenedRoomNotices.clear();
+        unreadNoticesByRoom.clear();
         unreadMessagesByRoom.clear();
-        unreadApprovals = 0;
         updateChatBadge();
         clearIncomingRequestBadge();
         NotificationCards.clear(this);
