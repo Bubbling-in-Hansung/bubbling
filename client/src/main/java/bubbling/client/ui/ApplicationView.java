@@ -2,6 +2,7 @@ package bubbling.client.ui;
 
 import bubbling.client.LiveSession;
 import bubbling.client.ui.dialog.NotificationCards;
+import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.user.UserDto;
 import bubbling.client.ui.model.*;
 import bubbling.client.ui.screen.*;
@@ -428,6 +429,12 @@ public final class ApplicationView extends JPanel {
 
     public void returnFromChat(String bubbleId) {
         if (currentPage.equals(CHAT) && chat.isShowingRoom(bubbleId)) showPage(HOME);
+    }
+
+    public void characterMoved(ChatPositionDto position) {
+        if (currentPage.equals(CHAT)) {
+            chat.updateCharacterPosition(position);
+        }
     }
 
     public void refreshLiveState() {

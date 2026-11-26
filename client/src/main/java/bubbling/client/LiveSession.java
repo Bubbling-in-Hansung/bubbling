@@ -17,6 +17,7 @@ import bubbling.common.dto.chat.ChatHistoryRequest;
 import bubbling.common.dto.chat.ChatLeaveRequest;
 import bubbling.common.dto.chat.ChatMemberCountEvent;
 import bubbling.common.dto.chat.ChatMessageDto;
+import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestDto;
 import bubbling.common.dto.chat.ChatRoomDto;
 import bubbling.common.dto.system.ExceptionResponse;
@@ -202,6 +203,9 @@ public final class LiveSession {
             }
             view.refreshLiveState();
         });
+        onAuthenticated(dispatcher, CHAT_POSITION_CHANGED, message -> {});
+        onAuthenticated(dispatcher, CHAT_POSITION_EVENT, ChatPositionDto.class,
+                position -> view.characterMoved(position));
     }
 
     private void onAuthenticated(ClientMessageDispatcher dispatcher, MessageType type,

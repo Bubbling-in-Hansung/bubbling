@@ -14,6 +14,7 @@ import static bubbling.client.ui.style.Styles.*;
 /** Native Java2D translation of world-sky/world-floor and CSS furniture. */
 public final class RoomScene extends JComponent {
     public static final int MAX_VISIBLE_PARTICIPANTS = 4;
+    public static final int POSITION_SCALE = 1000;
     private static final BufferedImage BACKGROUND = loadBackground();
     private static final double CHARACTER_SCALE = 1.3;
     private static final int CHARACTER_WIDTH = (int) Math.ceil(CharacterArt.BASE_WIDTH * CHARACTER_SCALE);
@@ -24,6 +25,7 @@ public final class RoomScene extends JComponent {
             NAME_PILL_BG = new Color(255, 255, 255, 220);
     private List<ChatParticipantDto> participants = List.of();
     private final java.util.List<String> drawOrder = new java.util.ArrayList<>();
+    private final java.util.Map<String, Point2D.Double> positions = new java.util.HashMap<>();
     private String myMemberId;
     private Point2D.Double ownPosition;
     private java.util.function.IntSupplier character = () -> 0;
@@ -39,6 +41,7 @@ public final class RoomScene extends JComponent {
         for (int i = 0; i < visibleCount; i++) {
             visibleIds.add(participants.get(i).chatMemberId());
         }
+        positions.keySet().retainAll(visibleIds);
         drawOrder.retainAll(visibleIds);
         for (String id : visibleIds) {
             if (!drawOrder.contains(id)) {
@@ -55,15 +58,35 @@ public final class RoomScene extends JComponent {
         }
     }
 
+    public Point toScaledPosition(Point target) {
+        if (getWidth() <= 0 || getHeight() <= 0) return new Point();
+        int x = (int) Math.round(Math.clamp((double) target.x / getWidth(), 0.0, 1.0) * POSITION_SCALE);
+        int y = (int) Math.round(Math.clamp((double) target.y / getHeight(), 0.0, 1.0) * POSITION_SCALE);
+        return new Point(x, y);
+    }
+
     public void moveOwnCharacter(Point target) {
         if (getWidth() <= 0 || getHeight() <= 0) return;
         ownPosition = new Point2D.Double((double) target.x / getWidth(), (double) target.y / getHeight());
+        if (myMemberId != null) {
+            positions.put(myMemberId, ownPosition);
+        }
         bringToFront(myMemberId);
+        repaint();
+    }
+
+    public void moveCharacter(String memberId, int scaledX, int scaledY) {
+        if (memberId == null) return;
+        double x = Math.clamp(scaledX / (double) POSITION_SCALE, 0.0, 1.0);
+        double y = Math.clamp(scaledY / (double) POSITION_SCALE, 0.0, 1.0);
+        positions.put(memberId, new Point2D.Double(x, y));
+        bringToFront(memberId);
         repaint();
     }
 
     public void resetOwnPosition() {
         ownPosition = null;
+        positions.clear();
         drawOrder.clear();
         repaint();
     }
@@ -89,12 +112,14 @@ public final class RoomScene extends JComponent {
 
     public Point participantHead(int participant) {
         int w = getWidth(), h = getHeight(), floor = (int) (h * .36), roomHeight = h - floor;
-        boolean own = participant < participants.size()
-                && participants.get(participant).chatMemberId().equals(myMemberId);
-        if (own && ownPosition != null) {
+        String memberId = participant < participants.size() ? participants.get(participant).chatMemberId() : null;
+        boolean own = memberId != null && memberId.equals(myMemberId);
+        Point2D.Double moved = memberId != null && positions.containsKey(memberId)
+                ? positions.get(memberId) : (own ? ownPosition : null);
+        if (moved != null) {
             int margin = Math.min(w / 2, Math.max(CHARACTER_WIDTH, NAME_WIDTH) / 2);
-            int x = (int) Math.round(ownPosition.x * w);
-            int y = (int) Math.round(ownPosition.y * h) - CHARACTER_HEIGHT / 2;
+            int x = (int) Math.round(moved.x * w);
+            int y = (int) Math.round(moved.y * h) - CHARACTER_HEIGHT / 2;
             return new Point(Math.clamp(x, margin, w - margin), Math.clamp(y, 0, Math.max(0, h - FIGURE_HEIGHT)));
         }
         Point head = switch (participant) {

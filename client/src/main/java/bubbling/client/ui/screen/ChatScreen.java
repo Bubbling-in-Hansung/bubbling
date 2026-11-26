@@ -8,6 +8,7 @@ import bubbling.client.ui.drawing.MessageBubble;
 import bubbling.client.ui.model.*;
 import bubbling.client.ui.style.UiFonts;
 import bubbling.common.dto.chat.ChatParticipantDto;
+import bubbling.common.dto.chat.ChatPositionDto;
 import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
@@ -58,7 +59,10 @@ public final class ChatScreen extends JPanel {
         header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, HEADER_LINE),
                 BorderFactory.createEmptyBorder(12, 18, 4, 18)));
         header.setPreferredSize(new Dimension(0, 70));
-        JButton backButton = button("홈으로", false, back);
+        JButton backButton = button("홈으로", false, () -> {
+            scene.resetOwnPosition();
+            back.run();
+        });
         backButton.setIcon(icon("chevron-left"));
         backButton.setFont(font(13, true));
         backButton.putClientProperty("flat", true);
@@ -121,7 +125,9 @@ public final class ChatScreen extends JPanel {
             @Override
             public void mouseClicked(MouseEvent event) {
                 if (SwingUtilities.isLeftMouseButton(event) && current != null && current.joined && !current.ended) {
+                    Point scaled = scene.toScaledPosition(event.getPoint());
                     scene.moveOwnCharacter(event.getPoint());
+                    session.moveCharacter(current, scaled.x, scaled.y);
                     layoutSpeech(scene.getWidth(), scene.getHeight());
                     speech.repaint();
                 }
@@ -313,6 +319,16 @@ public final class ChatScreen extends JPanel {
 
     public boolean isShowingRoom(String bubbleId) {
         return current != null && current.bubbleId.equals(bubbleId);
+    }
+
+    public void updateCharacterPosition(ChatPositionDto position) {
+        if (position == null || current == null || current.conversation == null
+                || !current.conversation.chatRoomId().equals(position.chatRoomId()) || current.ended) {
+            return;
+        }
+        scene.moveCharacter(position.chatMemberId(), position.x(), position.y());
+        layoutSpeech(scene.getWidth(), scene.getHeight());
+        speech.repaint();
     }
 
     public void resetLive() {

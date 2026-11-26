@@ -454,6 +454,11 @@ public final class UiSession {
         liveRequests.sendMessage(r.conversation.chatRoomId(), text);
     }
 
+    public void moveCharacter(Room r, int x, int y) {
+        if (r == null || r.conversation == null || r.conversation.myMemberId() == null) return;
+        liveRequests.moveCharacter(r.conversation.chatRoomId(), r.conversation.myMemberId(), x, y);
+    }
+
     public List<Message> speech(Room r, String memberId) {
         if (r == null || memberId == null) return List.of();
         Deque<Message> recent = r.recentSpeechByMember.get(memberId);

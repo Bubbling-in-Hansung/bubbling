@@ -2,6 +2,7 @@ package bubbling.client;
 
 import bubbling.client.network.ClientMessageDispatcher;
 import bubbling.client.ui.ApplicationView;
+import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.model.UiData;
 import bubbling.common.codec.JsonCodec;
 import bubbling.common.dto.auth.LoginResponse;
@@ -11,6 +12,7 @@ import bubbling.common.dto.bubble.BubbleUpdateRequest;
 import bubbling.common.dto.chat.ChatEndResponse;
 import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.common.dto.chat.ChatParticipantDto;
+import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRoomDto;
 import bubbling.common.dto.chat.ChatRequestDto;
 import bubbling.common.dto.system.ExceptionResponse;
@@ -27,6 +29,8 @@ import bubbling.common.protocol.MessageEnvelope;
 import org.junit.jupiter.api.Test;
 
 import javax.swing.SwingUtilities;
+import java.awt.Component;
+import java.awt.Container;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -267,6 +271,70 @@ class LiveProtocolTest {
             assertEquals(0, data.session().room("shared").reactionCount);
             live.close();
         });
+    }
+
+    @Test
+    void syncsCharacterPositionRequestAndEventInChatRoom() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+            var owned = bubble("owned");
+            var chatRoom = new ChatRoomDto("chat-owned", owned, ChatRoomStatus.ACTIVE, "me", true,
+                    List.of(
+                            new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE),
+                            new ChatParticipantDto("peer", "상대방", ProfileCharacter.EXAMPLE)),
+                    owned.createdAt(), null);
+            dispatcher.dispatch(new MessageEnvelope(MY_CHAT_ROOM_LIST, "list", codec.toPayload(List.of(chatRoom))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            var room = data.session().room("owned");
+            application.get().enterRoom(room.view);
+            assertEquals("chat", application.get().currentPage());
+            RoomScene scene = findComponent(application.get(), RoomScene.class);
+            assertNotNull(scene);
+            scene.setSize(1000, 600);
+
+            data.session().moveCharacter(room, 650, 400);
+            var moveMsg = sent.getLast();
+            assertEquals(CHAT_POSITION_REQUEST, moveMsg.type());
+            assertEquals(new ChatPositionDto("chat-owned", "me", 650, 400),
+                    codec.fromPayload(moveMsg.payload(), ChatPositionDto.class));
+
+            dispatcher.dispatch(new MessageEnvelope(CHAT_POSITION_CHANGED, moveMsg.requestId(), null));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_POSITION_EVENT, null,
+                    codec.toPayload(new ChatPositionDto("chat-owned", "peer", 320, 720))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            RoomScene scene = findComponent(application.get(), RoomScene.class);
+            assertNotNull(scene);
+            assertEquals(1, scene.paintOrder().getLast());
+            assertEquals(320, scene.participantHead(1).x);
+            assertEquals(370, scene.participantHead(1).y);
+            live.close();
+        });
+    }
+
+    private static <T extends Component> T findComponent(Container root, Class<T> type) {
+        for (Component child : root.getComponents()) {
+            if (type.isInstance(child)) return type.cast(child);
+            if (child instanceof Container nested) {
+                T found = findComponent(nested, type);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private static BubbleDto bubble(String id) {

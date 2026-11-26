@@ -11,6 +11,7 @@ import bubbling.common.dto.chat.ChatEndRequest;
 import bubbling.common.dto.chat.ChatJoinRequest;
 import bubbling.common.dto.chat.ChatLeaveRequest;
 import bubbling.common.dto.chat.ChatMessageRequest;
+import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestCreateRequest;
 import bubbling.common.dto.chat.ChatRequestDecisionRequest;
 import bubbling.common.enums.BubbleCategory;
@@ -78,6 +79,10 @@ public final class SessionRequests {
 
     public void requestChatRequests() {
         send.accept(CHAT_REQUEST_LIST_REQUEST, null);
+    }
+
+    public void moveCharacter(String roomId, String memberId, int x, int y) {
+        send.accept(CHAT_POSITION_REQUEST, new ChatPositionDto(roomId, memberId, x, y));
     }
 
     private static BubbleCategory category(RoomView room) {
