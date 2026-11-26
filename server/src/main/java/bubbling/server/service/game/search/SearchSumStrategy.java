@@ -48,7 +48,7 @@ public class SearchSumStrategy implements GameResultSearchStrategy {
                             UserMapper.toDto(latest.getUser()),
                             type,
                             sum,
-                            latest.getCreatedAt()
+                            latest.getCreatedAt().toString()
                     );
                 })
                 .sorted(Comparator.comparingInt(GameRankingData::score).reversed())
