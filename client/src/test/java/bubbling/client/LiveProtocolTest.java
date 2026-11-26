@@ -300,7 +300,7 @@ class LiveProtocolTest {
                     List.of(
                             new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE),
                             new ChatParticipantDto("peer", "상대방", ProfileCharacter.EXAMPLE)),
-                    owned.createdAt(), null);
+                    owned.createdAt(), null, null);
             dispatcher.dispatch(new MessageEnvelope(MY_CHAT_ROOM_LIST, "list", codec.toPayload(List.of(chatRoom))));
         });
         SwingUtilities.invokeAndWait(() -> {
@@ -492,6 +492,6 @@ class LiveProtocolTest {
 
     private static ChatRoomDto chat(BubbleDto bubble, boolean owner) {
         return new ChatRoomDto("chat-" + bubble.bubbleId(), bubble, ChatRoomStatus.ACTIVE, "me", owner,
-                List.of(new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE)), bubble.createdAt(), null);
+                List.of(new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE)), bubble.createdAt(), null, null);
     }
 }
