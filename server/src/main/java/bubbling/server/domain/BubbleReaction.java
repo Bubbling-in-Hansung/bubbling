@@ -11,14 +11,12 @@ public class BubbleReaction {
     private final String id = UUID.randomUUID().toString();
     private final Bubble bubble;
     private final User user;
-    private int reactionCnt;
-    private final LocalDateTime lastReactAt;
+    private LocalDateTime lastReactAt;
 
     private BubbleReaction(Bubble bubble, User user) {
         this.bubble = bubble;
         this.user = user;
         this.lastReactAt = LocalDateTime.now();
-        this.reactionCnt = 1;
     }
 
     public static BubbleReaction create(Bubble bubble, User user) {
@@ -44,27 +42,21 @@ public class BubbleReaction {
         return user;
     }
 
-    public int getReactionCnt() {
-        return reactionCnt;
-    }
-
     public LocalDateTime getLastReactAt() {
         return lastReactAt;
     }
 
-    public void increaseReactionCnt() {
-        validateReaction();
-        this.reactionCnt++;
-    }
-
-    private void validateReaction() {
+    public synchronized void react() {
         if(!bubble.isAlive()) {
             throw new BaseException(BubbleExceptionCode.EXPIRED);
         }
 
-        if(LocalDateTime.now().minusMinutes(1).isAfter(lastReactAt)) {
+        LocalDateTime now = LocalDateTime.now();
+        if (now.isBefore(lastReactAt.plusMinutes(1))) {
             throw new BaseException(BubbleExceptionCode.INVALID_REACTION_PERIOD);
         }
+
+        this.lastReactAt = now;
     }
 
     @Override

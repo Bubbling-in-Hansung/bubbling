@@ -10,7 +10,7 @@ import bubbling.server.exception.code.AuthExceptionCode;
 import bubbling.server.mapper.UserMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
-import bubbling.server.service.AuthService;
+import bubbling.server.service.user.AuthService;
 
 public class AuthHandler {
 
@@ -71,10 +71,18 @@ public class AuthHandler {
         messageSender.send(connection, response);
     }
 
-    public void changePassword(
-            ClientConnection connection,
-            MessageEnvelope message
-    ) {
+    public void logout(ClientConnection connection, MessageEnvelope message) {
+        connection.logout();
+
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.LOGOUT_RESULT,
+                message.requestId(),
+                null
+        );
+        messageSender.send(connection, response);
+    }
+
+    public void changePassword(ClientConnection connection, MessageEnvelope message) {
         PasswordChangeRequest request = jsonCodec.fromPayload(
                 message.payload(),
                 PasswordChangeRequest.class

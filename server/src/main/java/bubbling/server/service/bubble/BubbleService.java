@@ -1,4 +1,4 @@
-package bubbling.server.service;
+package bubbling.server.service.bubble;
 
 import bubbling.common.enums.BubbleCategory;
 import bubbling.common.enums.BubbleMethod;
@@ -6,6 +6,8 @@ import bubbling.server.domain.Bubble;
 import bubbling.server.domain.User;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.BubbleExceptionCode;
+import bubbling.server.service.chat.ChatRequestService;
+import bubbling.server.service.chat.ChatRoomService;
 import bubbling.server.store.BubbleStore;
 
 import java.time.LocalDateTime;

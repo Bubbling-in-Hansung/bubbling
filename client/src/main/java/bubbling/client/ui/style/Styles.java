@@ -120,10 +120,6 @@ public final class Styles {
                 if (!primary && !flat && !borderless) {
                     g.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 20, 20);
                 }
-                if (hasFocus() && !category && !borderless) {
-                    g.setColor(PURPLE);
-                    g.drawRoundRect(2, 2, getWidth() - 5, getHeight() - 5, 18, 18);
-                }
                 g.dispose();
                 super.paintComponent(source);
             }
@@ -278,9 +274,7 @@ public final class Styles {
                     chevron.lineTo(14, 19);
                     g.draw(chevron);
                 } else if (name.equals("home")) {
-                    g.drawOval(2, 1, 9, 9);
-                    g.drawOval(11, 11, 8, 8);
-                    g.drawOval(1, 15, 4, 4);
+                    paintBubblesMark(g, 0, 0, 1.0);
                 } else if (name.equals("chat")) {
                     Path2D bubble = new Path2D.Float();
                     bubble.moveTo(6, 3);
@@ -437,12 +431,16 @@ public final class Styles {
         g.dispose();
     }
 
+    private static void paintBubblesMark(Graphics2D g, int x, int y, double scale) {
+        g.setStroke(new BasicStroke((float) (1.6 * scale), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(new java.awt.geom.Ellipse2D.Double(x + 2 * scale, y + 1 * scale, 9 * scale, 9 * scale));
+        g.draw(new java.awt.geom.Ellipse2D.Double(x + 11 * scale, y + 11 * scale, 8 * scale, 8 * scale));
+        g.draw(new java.awt.geom.Ellipse2D.Double(x + 1 * scale, y + 15 * scale, 4 * scale, 4 * scale));
+    }
+
     public static void logo(Graphics2D g, int x, int y, Color c, int size) {
         g.setColor(c);
-        g.setStroke(new BasicStroke(2));
-        g.drawOval(x + 2, y + 1, 18, 18);
-        g.drawOval(x + 14, y + 14, 15, 15);
-        g.drawOval(x + 2, y + 23, 7, 7);
+        paintBubblesMark(g, x, y, 1.45);
         g.setFont(UiFonts.logo(size));
         g.drawString("Bubbling", x + 41, y + 24);
     }

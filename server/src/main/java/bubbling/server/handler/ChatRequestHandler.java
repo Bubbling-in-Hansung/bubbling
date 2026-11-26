@@ -10,9 +10,9 @@ import bubbling.server.mapper.ChatRequestMapper;
 import bubbling.server.mapper.ChatRoomMapper;
 import bubbling.server.network.ClientConnection;
 import bubbling.server.network.MessageSender;
-import bubbling.server.service.BubbleService;
-import bubbling.server.service.ChatMemberService;
-import bubbling.server.service.ChatRequestService;
+import bubbling.server.service.bubble.BubbleService;
+import bubbling.server.service.chat.ChatMemberService;
+import bubbling.server.service.chat.ChatRequestService;
 
 import java.util.List;
 
@@ -161,5 +161,20 @@ public class ChatRequestHandler {
                 jsonCodec.toPayload(ChatRequestMapper.toDto(chatRequest, chatRequest.getRequester()))
         );
         messageSender.sendTarget(chatRequest.getRequester(), event);
+    }
+
+    public void list(ClientConnection connection, MessageEnvelope message) {
+        User user = connection.requireAuthenticatedUser();
+
+        List<ChatRequestDto> dtos = chatRequestService.findAllByBubbleOwner(user)
+                .stream()
+                .map(cr -> ChatRequestMapper.toDto(cr, user)).toList();
+
+        MessageEnvelope response = new MessageEnvelope(
+                MessageType.CHAT_REQUEST_LIST,
+                message.requestId(),
+                jsonCodec.toPayload(dtos)
+        );
+        messageSender.send(connection, response);
     }
 }

@@ -1,0 +1,79 @@
+[
+  {
+    "key": "bubble-01",
+    "ownerLoginId": "testuser1",
+    "title": "진로를 어떻게 정해야 할지 고민이에요",
+    "category": "CAREER",
+    "method": "SOLUTION",
+    "maxMemberCnt": 4,
+    "isOpen": true,
+    "expireMinute": 60,
+    "expired": false
+  },
+  {
+    "key": "bubble-02",
+    "ownerLoginId": "testuser2",
+    "title": "오늘 있었던 이야기를 들어주세요",
+    "category": "ETC",
+    "method": "LISTEN",
+    "maxMemberCnt": 3,
+    "isOpen": true,
+    "expireMinute": 40,
+    "expired": false
+  },
+  {
+    "key": "bubble-03",
+    "ownerLoginId": "testuser3",
+    "title": "취업 준비에 대한 조언이 필요해요",
+    "category": "CAREER",
+    "method": "SOLUTION",
+    "maxMemberCnt": 2,
+    "isOpen": false,
+    "expireMinute": 30,
+    "expired": false
+  },
+  {
+    "key": "bubble-04",
+    "ownerLoginId": "testuser4",
+    "title": "그냥 누군가와 이야기하고 싶어요",
+    "category": "ETC",
+    "method": "LISTEN",
+    "maxMemberCnt": 4,
+    "isOpen": false,
+    "expireMinute": 60,
+    "expired": false
+  },
+  {
+    "key": "bubble-05",
+    "ownerLoginId": "testuser5",
+    "title": "요즘 회사 생활이 너무 힘들어요",
+    "category": "CAREER",
+    "method": "LISTEN",
+    "maxMemberCnt": 3,
+    "isOpen": true,
+    "expireMinute": 10,
+    "expired": false
+  },
+  {
+    "key": "bubble-06",
+    "ownerLoginId": "testuser6",
+    "title": "이미 해결된 고민이에요",
+    "category": "ETC",
+    "method": "SOLUTION",
+    "maxMemberCnt": 4,
+    "isOpen": true,
+    "expireMinute": 30,
+    "expired": true
+  },
+  {
+    "key": "bubble-07",
+    "ownerLoginId": "testuser7",
+    "title": "상담이 마감된 비공개 대화예요",
+    "category": "CAREER",
+    "method": "LISTEN",
+    "maxMemberCnt": 2,
+    "isOpen": false,
+    "expireMinute": 60,
+    "expired": true
+  }
+]

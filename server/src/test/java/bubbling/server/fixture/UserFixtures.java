@@ -1,7 +1,7 @@
 package bubbling.server.fixture;
 
 import bubbling.server.domain.User;
-import bubbling.server.service.AuthService;
+import bubbling.server.service.user.AuthService;
 
 public final class UserFixtures {
 

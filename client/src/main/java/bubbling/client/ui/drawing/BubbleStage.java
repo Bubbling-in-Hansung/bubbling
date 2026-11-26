@@ -6,12 +6,19 @@ import static bubbling.client.ui.style.Styles.*;
 
 /** Overlays never consume a strip of the bubble field. All dimensions are logical pixels. */
 public final class BubbleStage extends JPanel {
+    private static final int WRITE_BASE_WIDTH = 176;
+    private static final int WRITE_BASE_HEIGHT = 56;
+    private static final int WRITE_HOVER_EXTRA_W = 10;
+    private static final int WRITE_HOVER_EXTRA_H = 6;
     private static final Color SUBTITLE_INK = color("777388"), STAGE_MID = color("fbfaff"),
             STAGE_EDGE = color("f7f5fc"), GLOW_PURPLE = color("eee8ff"), GLOW_CYAN = color("e5f8fa");
     private final JPanel field;
     private final JPanel heading = column();
     private final JButton requests, create;
     private final JLabel legend = label("•  비눗방울 위에 마우스를 올리면 잠시 멈춰요", 12, MUTED);
+    private boolean createHovered;
+    private int writeBaseWidth = WRITE_BASE_WIDTH;
+    private int writeBaseHeight = WRITE_BASE_HEIGHT;
     public BubbleStage(JPanel field, Runnable manage, Runnable write) {
         super(null);
         this.field = field;
@@ -32,6 +39,16 @@ public final class BubbleStage extends JPanel {
         create.setIcon(penIcon());
         create.setIconTextGap(9);
         create.setBorder(BorderFactory.createEmptyBorder(14, 26, 14, 26));
+        create.getModel().addChangeListener(e -> {
+            boolean rollover = create.getModel().isRollover();
+            if (createHovered != rollover) {
+                createHovered = rollover;
+                create.setFont(font(createHovered ? 15 : 14, true));
+                revalidate();
+                doLayout();
+                repaint();
+            }
+        });
         add(heading);
         add(requests);
         add(create);
@@ -47,11 +64,17 @@ public final class BubbleStage extends JPanel {
         int requestsWidth = Math.max(128, requestsSize.width);
         int requestsHeight = Math.max(40, requestsSize.height);
         requests.setBounds(Math.max(0, getWidth() - 28 - requestsWidth), 20, requestsWidth, requestsHeight);
-        Dimension writeSize = create.getPreferredSize();
-        int writeWidth = Math.max(176, writeSize.width);
-        int writeHeight = Math.max(56, writeSize.height);
-        create.setBounds(Math.max(0, getWidth() - 28 - writeWidth),
-                Math.max(0, getHeight() - 24 - writeHeight), writeWidth, writeHeight);
+        if (!createHovered) {
+            Dimension writeSize = create.getPreferredSize();
+            writeBaseWidth = Math.max(WRITE_BASE_WIDTH, writeSize.width);
+            writeBaseHeight = Math.max(WRITE_BASE_HEIGHT, writeSize.height);
+        }
+        int extraW = createHovered ? WRITE_HOVER_EXTRA_W : 0;
+        int extraH = createHovered ? WRITE_HOVER_EXTRA_H : 0;
+        int x0 = Math.max(0, getWidth() - 28 - writeBaseWidth);
+        int y0 = Math.max(0, getHeight() - 24 - writeBaseHeight);
+        create.setBounds(Math.max(0, x0 - extraW / 2), Math.max(0, y0 - extraH / 2),
+                writeBaseWidth + extraW, writeBaseHeight + extraH);
         Dimension legendSize = legend.getPreferredSize();
         legend.setBounds(28, Math.max(0, getHeight() - 40), legendSize.width, legendSize.height);
     }

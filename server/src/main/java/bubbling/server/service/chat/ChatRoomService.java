@@ -1,10 +1,7 @@
-package bubbling.server.service;
+package bubbling.server.service.chat;
 
 import bubbling.common.enums.ChatRequestStatus;
-import bubbling.server.domain.Bubble;
-import bubbling.server.domain.ChatMember;
-import bubbling.server.domain.ChatRoom;
-import bubbling.server.domain.User;
+import bubbling.server.domain.*;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.BubbleExceptionCode;
 import bubbling.server.exception.code.ChatMemberExceptionCode;
@@ -131,6 +128,10 @@ public class ChatRoomService {
 
         chatRoom.end();
         chatRoom.getBubble().close();
+        chatRequestStore.findAllByBubble(chatRoom.getBubble())
+                .stream()
+                .filter(request -> request.getStatus() == ChatRequestStatus.PENDING)
+                .forEach(ChatRequest::cancel);
 
         return chatRoom;
     }

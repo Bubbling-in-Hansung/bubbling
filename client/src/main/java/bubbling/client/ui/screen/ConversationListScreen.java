@@ -1,6 +1,7 @@
 package bubbling.client.ui.screen;
 
 import bubbling.client.ui.model.*;
+import bubbling.client.ui.dialog.ActionDialog;
 import bubbling.client.ui.dialog.UiErrors;
 import javax.swing.*;
 import java.awt.*;
@@ -15,6 +16,10 @@ public final class ConversationListScreen extends JPanel {
     private static final int MIN_ROW_HEIGHT = 128;
     private static final int ROW_EXTRA_HEIGHT = 6;
     private static final int EXPIRY_CHECK_MS = 1000;
+    private static final int ACTION_BUTTON_WIDTH = 112;
+    private static final int ACTION_BUTTON_HEIGHT = 63;
+    private static final int DELETE_BUTTON_WIDTH = 76;
+    private static final Color DELETE_INK = color("c5667c");
     private static final Icon NOTIFICATION_BADGE = new Icon() {
         public int getIconWidth() { return 16; }
         public int getIconHeight() { return 16; }
@@ -41,16 +46,15 @@ public final class ConversationListScreen extends JPanel {
     private Filter filter = Filter.ACTIVE;
     private String expirySignature = "";
     private enum Filter {
-        ALL("전체"), ACTIVE("진행 중"), EXPIRED("만료됨"), ENDED("종료됨");
+        ALL("전체"), ACTIVE("진행 중"), ENDED("종료됨");
         private final String label;
         Filter(String label) {
             this.label = label;
         }
-        boolean includes(UiSession.Room room, UiSession session) {
+        boolean includes(UiSession.Room room) {
             return switch (this) {
                 case ALL -> true;
-                case ACTIVE -> !room.ended && !session.expired(room);
-                case EXPIRED -> session.expired(room);
+                case ACTIVE -> !room.ended;
                 case ENDED -> room.ended;
             };
         }
@@ -108,7 +112,7 @@ public final class ConversationListScreen extends JPanel {
         expirySignature = expiryKey();
         rows.removeAll();
         var visibleRooms = session.rooms().stream()
-                .filter(r -> (r.listed || r.visited) && filter.includes(r, session))
+                .filter(r -> r.listed && filter.includes(r))
                 .sorted(Comparator.comparing((UiSession.Room r) -> !r.view.owner()))
                 .toList();
         for (var r : visibleRooms) {
@@ -123,7 +127,7 @@ public final class ConversationListScreen extends JPanel {
 
     private String expiryKey() {
         return session.rooms().stream()
-                .filter(r -> r.listed || r.visited)
+                .filter(r -> r.listed)
                 .map(r -> r.id + ":" + r.ended + ":" + session.expired(r))
                 .toList()
                 .toString();
@@ -140,7 +144,7 @@ public final class ConversationListScreen extends JPanel {
             statusRow.add(ownerBadge());
             statusRow.add(Box.createHorizontalStrut(6));
         }
-        String statusText = r.ended ? "종료됨" : session.expired(r) ? "만료됨" : "진행 중";
+        String statusText = r.ended ? "종료됨" : session.expired(r) ? "진행 중 (만료됨)" : "진행 중";
         statusRow.add(label(statusText
                 + (r.view.category() == null ? "" : " · " + r.view.category()), 11, PURPLE));
         statusRow.add(Box.createHorizontalGlue());
@@ -171,7 +175,34 @@ public final class ConversationListScreen extends JPanel {
         JButton action = button(r.ended ? "기록 보기" : "대화로 이동", false,
                 () -> UiErrors.perform(this, () -> enter.accept(r.view)));
         action.setEnabled(session.canOpen(r));
-        row.add(action, BorderLayout.EAST);
+        Dimension actionSize = new Dimension(ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT);
+        action.setPreferredSize(actionSize);
+        action.setMinimumSize(actionSize);
+        action.setMaximumSize(actionSize);
+        JPanel actionRow = panel(null);
+        actionRow.setLayout(new BoxLayout(actionRow, BoxLayout.X_AXIS));
+        actionRow.add(action);
+        if (r.view.owner()) {
+            JButton delete = button("삭제", false, () -> {
+                if (ActionDialog.confirm(this, "비눗방울을 삭제할까요?", "삭제")) {
+                    UiErrors.perform(this, () -> {
+                        session.remove(r);
+                        refresh();
+                    });
+                }
+            });
+            delete.setForeground(DELETE_INK);
+            delete.setEnabled(!r.deleted);
+            Dimension deleteSize = new Dimension(DELETE_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT);
+            delete.setPreferredSize(deleteSize);
+            delete.setMinimumSize(deleteSize);
+            delete.setMaximumSize(deleteSize);
+            actionRow.add(Box.createHorizontalStrut(8));
+            actionRow.add(delete);
+        }
+        JPanel eastSlot = panel(new GridBagLayout());
+        eastSlot.add(actionRow);
+        row.add(eastSlot, BorderLayout.EAST);
         int rowHeight = Math.max(MIN_ROW_HEIGHT, row.getPreferredSize().height + ROW_EXTRA_HEIGHT);
         row.setPreferredSize(new Dimension(0, rowHeight));
         row.setMaximumSize(new Dimension(Integer.MAX_VALUE, rowHeight));

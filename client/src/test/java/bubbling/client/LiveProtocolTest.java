@@ -2,16 +2,22 @@ package bubbling.client;
 
 import bubbling.client.network.ClientMessageDispatcher;
 import bubbling.client.ui.ApplicationView;
+import bubbling.client.ui.dialog.NotificationCards;
+import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.model.UiData;
 import bubbling.common.codec.JsonCodec;
 import bubbling.common.dto.auth.LoginResponse;
 import bubbling.common.dto.bubble.BubbleDto;
 import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.bubble.BubbleUpdateRequest;
+import bubbling.common.dto.chat.ChatEndResponse;
+import bubbling.common.dto.chat.ChatMemberEvent;
 import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.common.dto.chat.ChatParticipantDto;
+import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRoomDto;
 import bubbling.common.dto.chat.ChatRequestDto;
+import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.user.UserDto;
 import bubbling.common.enums.BubbleCategory;
@@ -24,11 +30,16 @@ import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageEnvelope;
 import org.junit.jupiter.api.Test;
 
+import javax.swing.JButton;
+import javax.swing.JRootPane;
 import javax.swing.SwingUtilities;
+import java.awt.Component;
+import java.awt.Container;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static bubbling.common.protocol.MessageType.*;
@@ -83,6 +94,8 @@ class LiveProtocolTest {
         SwingUtilities.invokeAndWait(() -> {
             assertEquals("home", application.get().currentPage());
             assertFalse(data.session().room("shared").joined);
+            assertFalse(data.session().room("shared").listed);
+            assertFalse(data.session().room("shared").visited);
             assertTrue(data.session().room("owned").joined);
             assertEquals(MY_CHAT_ROOM_LIST_REQUEST, sent.getLast().type());
             var updated = bubble("owned", "2099-01-01T00:30:00");
@@ -123,6 +136,349 @@ class LiveProtocolTest {
         state.markBubbleRemoved(new BubbleRemovedEvent("bubble", BubbleStatus.EXPIRED));
         assertEquals(ChatRequestStatus.CANCELLED, state.requests().getFirst().status);
         assertEquals(ChatRequestStatus.ACCEPTED, state.requests().getLast().status);
+    }
+
+    @Test
+    void marksBubbleDeletedAndClearsConversationListing() {
+        var state = new UiData((type, payload) -> {}).session();
+        var bubble = bubble("owned");
+        var room = state.applyChatRoom(chat(bubble, true));
+        state.visit(room);
+        assertTrue(room.listed);
+        assertTrue(room.visited);
+        assertFalse(room.deleted);
+
+        state.markBubbleRemoved(new BubbleRemovedEvent("owned", BubbleStatus.EXPIRED));
+        assertTrue(room.removed);
+        assertFalse(room.deleted);
+
+        state.markBubbleRemoved(new BubbleRemovedEvent("owned", BubbleStatus.DELETED));
+        assertTrue(room.deleted);
+        assertFalse(room.listed);
+        assertFalse(room.visited);
+        assertFalse(room.joined);
+    }
+
+    @Test
+    void appliesRequestListAndCancelsPendingRequestsOnChatEnd() {
+        var state = new UiData((type, payload) -> {}).session();
+        var owned = bubble("owned");
+        var ended = bubble("ended");
+        state.applyChatRoom(chat(owned, true));
+        var endedRoom = state.applyChatRoom(chat(ended, true));
+        state.markEnded(new ChatEndResponse(endedRoom.conversation.chatRoomId(), "ended"));
+
+        state.applyRequest(new ChatRequestDto("accepted", "owned", ChatRequestStatus.ACCEPTED, "기존승인",
+                ChatRequestRole.OWNER, null));
+
+        int added = state.applyRequestList(new ChatRequestDto[] {
+                new ChatRequestDto("accepted", "owned", ChatRequestStatus.PENDING, "기존승인",
+                        ChatRequestRole.OWNER, null),
+                new ChatRequestDto("pending-1", "owned", ChatRequestStatus.PENDING, "대기1",
+                        ChatRequestRole.OWNER, null),
+                new ChatRequestDto("pending-2", "owned", ChatRequestStatus.PENDING, "대기2",
+                        ChatRequestRole.OWNER, null),
+                new ChatRequestDto("ended-req", "ended", ChatRequestStatus.PENDING, "종료방요청",
+                        ChatRequestRole.OWNER, null)
+        });
+
+        assertEquals(2, added);
+        assertEquals(3, state.requests().size());
+        assertEquals(ChatRequestStatus.ACCEPTED, state.requests().get(0).status);
+        assertEquals(ChatRequestStatus.PENDING, state.requests().get(1).status);
+        assertEquals(ChatRequestStatus.PENDING, state.requests().get(2).status);
+
+        state.markEnded(new ChatEndResponse("chat-owned", "owned"));
+        assertEquals(ChatRequestStatus.ACCEPTED, state.requests().get(0).status);
+        assertEquals(ChatRequestStatus.CANCELLED, state.requests().get(1).status);
+        assertEquals(ChatRequestStatus.CANCELLED, state.requests().get(2).status);
+    }
+
+    @Test
+    void logsOutAndAllowsReloginOnSameConnection() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("home", application.get().currentPage());
+            assertTrue(sent.stream().anyMatch(msg -> msg.type() == CHAT_REQUEST_LIST_REQUEST));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_REQUEST_LIST, null, codec.toPayload(List.of(
+                    new ChatRequestDto("req-1", "owned", ChatRequestStatus.PENDING, "요청자",
+                            ChatRequestRole.OWNER, null)))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(1, data.session().requests().size());
+            live.logout();
+            var logoutMsg = sent.getLast();
+            assertEquals(LOGOUT, logoutMsg.type());
+            dispatcher.dispatch(new MessageEnvelope(LOGOUT_RESULT, logoutMsg.requestId(), null));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("login", application.get().currentPage());
+            assertTrue(data.session().rooms().isEmpty());
+            assertTrue(data.session().requests().isEmpty());
+
+            live.authenticate(false, "other123", "password", "");
+            String secondLoginId = sent.getLast().requestId();
+            var secondUser = new UserDto("user-2", "other123", "다른사용자", ProfileCharacter.EXAMPLE,
+                    "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, secondLoginId,
+                    codec.toPayload(new LoginResponse(secondUser))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("home", application.get().currentPage());
+            live.close();
+        });
+    }
+
+    @Test
+    void keepsReactionCountWhenReactionCooldownErrorArrives() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+            dispatcher.dispatch(new MessageEnvelope(INITIAL_STATE, "init",
+                    codec.toPayload(new InitialStateDto(List.of(bubble("shared")), 1))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            var room = data.session().room("shared");
+            data.session().react(room);
+            var reactMsg = sent.getLast();
+            assertEquals(BUBBLE_REACT, reactMsg.type());
+            dispatcher.dispatch(new MessageEnvelope(ERROR, reactMsg.requestId(),
+                    codec.toPayload(new ExceptionResponse("BUBBLE_008", "공감은 1분에 한 번씩 할 수 있습니다."))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(0, data.session().room("shared").reactionCount);
+            live.close();
+        });
+    }
+
+    @Test
+    void syncsCharacterPositionRequestAndEventInChatRoom() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+            var owned = bubble("owned");
+            var chatRoom = new ChatRoomDto("chat-owned", owned, ChatRoomStatus.ACTIVE, "me", true,
+                    List.of(
+                            new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE),
+                            new ChatParticipantDto("peer", "상대방", ProfileCharacter.EXAMPLE)),
+                    owned.createdAt(), null);
+            dispatcher.dispatch(new MessageEnvelope(MY_CHAT_ROOM_LIST, "list", codec.toPayload(List.of(chatRoom))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            var room = data.session().room("owned");
+            application.get().enterRoom(room.view);
+            assertEquals("chat", application.get().currentPage());
+            RoomScene scene = findComponent(application.get(), RoomScene.class);
+            assertNotNull(scene);
+            scene.setSize(1000, 600);
+
+            data.session().moveCharacter(room, 650, 400);
+            var moveMsg = sent.getLast();
+            assertEquals(CHAT_POSITION_REQUEST, moveMsg.type());
+            assertEquals(new ChatPositionDto("chat-owned", "me", 650, 400),
+                    codec.fromPayload(moveMsg.payload(), ChatPositionDto.class));
+
+            dispatcher.dispatch(new MessageEnvelope(CHAT_POSITION_CHANGED, moveMsg.requestId(), null));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_POSITION_EVENT, null,
+                    codec.toPayload(new ChatPositionDto("chat-owned", "peer", 320, 720))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            RoomScene scene = findComponent(application.get(), RoomScene.class);
+            assertNotNull(scene);
+            assertEquals(1, scene.paintOrder().getLast());
+            assertEquals(320, scene.participantHead(1).x);
+            assertEquals(370, scene.participantHead(1).y);
+            live.close();
+        });
+    }
+
+    @Test
+    void notifiesAndIncrementsChatBadgeWhenMemberJoinsOpenRoom() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+        var root = new AtomicReference<JRootPane>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            var pane = new JRootPane();
+            var view = new ApplicationView(data, live);
+            pane.setSize(1200, 800);
+            pane.setContentPane(view);
+            root.set(pane);
+            application.set(view);
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+
+            var openBubble = new BubbleDto("open", "공개 고민", BubbleCategory.DAILY, BubbleMethod.TOGETHER,
+                    4, 1, true, BubbleStatus.ALIVE, 0, "2026-11-23T00:00:00", "2099-01-01T00:00:00");
+            var privateBubble = bubble("private");
+            dispatcher.dispatch(new MessageEnvelope(MY_CHAT_ROOM_LIST, "list",
+                    codec.toPayload(List.of(chat(openBubble, true), chat(privateBubble, true)))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MEMBER_JOINED, null, codec.toPayload(
+                    new ChatMemberEvent("chat-open",
+                            new ChatParticipantDto("member-2", "말랑한 토끼", ProfileCharacter.BUNNY)))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            JButton chatButton = findButton(application.get(), "채팅");
+            assertNotNull(chatButton);
+            assertEquals("채팅, 확인하지 않은 알림 1건", chatButton.getAccessibleContext().getAccessibleName());
+            assertNotNull(findByAccessibleName(root.get().getLayeredPane(), "새 참여자가 들어왔어요"));
+
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MEMBER_JOINED, null, codec.toPayload(
+                    new ChatMemberEvent("chat-open",
+                            new ChatParticipantDto("member-2", "말랑한 토끼", ProfileCharacter.BUNNY)))));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MEMBER_JOINED, null, codec.toPayload(
+                    new ChatMemberEvent("chat-open",
+                            new ChatParticipantDto("member-3", "포근한 여우", ProfileCharacter.FOX)))));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MEMBER_JOINED, null, codec.toPayload(
+                    new ChatMemberEvent("chat-private",
+                            new ChatParticipantDto("member-4", "졸린 펭귄", ProfileCharacter.PENGUIN)))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            JButton chatButton = findButton(application.get(), "채팅");
+            assertNotNull(chatButton);
+            assertEquals("채팅, 확인하지 않은 알림 2건", chatButton.getAccessibleContext().getAccessibleName());
+
+            application.get().showPage("conversations");
+            assertEquals("채팅", chatButton.getAccessibleContext().getAccessibleName());
+            NotificationCards.clear(application.get());
+            live.close();
+        });
+    }
+
+    @Test
+    void maintainsConnectionOnMatchingPongAndDisconnectsOnPongTimeout() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var closedCount = new AtomicInteger();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add, closedCount::incrementAndGet);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            assertTrue(live.isPingScheduled());
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("home", application.get().currentPage());
+            live.sendPing();
+            var ping = sent.getLast();
+            assertEquals(PING, ping.type());
+            assertNotNull(ping.requestId());
+            assertTrue(live.isAwaitingPong());
+
+            dispatcher.dispatch(new MessageEnvelope(PONG, "unrelated", null));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(live.isAwaitingPong());
+            String pingId = sent.getLast().requestId();
+            dispatcher.dispatch(new MessageEnvelope(PONG, pingId, null));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertFalse(live.isAwaitingPong());
+            assertEquals(0, closedCount.get());
+            assertEquals("home", application.get().currentPage());
+
+            live.sendPing();
+            assertTrue(live.isAwaitingPong());
+            live.onPongTimeout();
+            assertEquals(1, closedCount.get());
+            assertFalse(live.isPingScheduled());
+            assertFalse(live.isAwaitingPong());
+            assertEquals("login", application.get().currentPage());
+
+            live.disconnected("서버 연결이 끊겼습니다. 앱을 다시 실행해 주세요.");
+            assertEquals(1, closedCount.get());
+            live.close();
+        });
+    }
+
+    private static JButton findButton(Container root, String text) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JButton button && text.equals(button.getText())) return button;
+            if (child instanceof Container nested) {
+                JButton found = findButton(nested, text);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static Component findByAccessibleName(Container root, String name) {
+        for (Component child : root.getComponents()) {
+            if (name.equals(child.getAccessibleContext().getAccessibleName())) return child;
+            if (child instanceof Container nested) {
+                Component found = findByAccessibleName(nested, name);
+                if (found != null) return found;
+            }
+        }
+        return null;
+    }
+
+    private static <T extends Component> T findComponent(Container root, Class<T> type) {
+        for (Component child : root.getComponents()) {
+            if (type.isInstance(child)) return type.cast(child);
+            if (child instanceof Container nested) {
+                T found = findComponent(nested, type);
+                if (found != null) return found;
+            }
+        }
+        return null;
     }
 
     private static BubbleDto bubble(String id) {

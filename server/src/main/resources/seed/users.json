@@ -1,0 +1,52 @@
+[
+  {
+    "loginId": "testuser1",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저1"
+  },
+  {
+    "loginId": "testuser2",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저2"
+  },
+  {
+    "loginId": "testuser3",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저3"
+  },
+  {
+    "loginId": "testuser4",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저5"
+  },
+  {
+    "loginId": "testuser5",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저5"
+  },
+  {
+    "loginId": "testuser6",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저6"
+  },
+  {
+    "loginId": "testuser7",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저7"
+  },
+  {
+    "loginId": "testuser8",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저8"
+  },
+  {
+    "loginId": "testuser9",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저9"
+  },
+  {
+    "loginId": "testuser10",
+    "passwordHash": "$2a$12$NODyzniyZKW77Ot4WJi2JeSRlqd9sAy5nB168lteIj23R/uIZVi5q",
+    "nickname": "테스트유저10"
+  }
+]

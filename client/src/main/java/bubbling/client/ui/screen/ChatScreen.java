@@ -8,6 +8,7 @@ import bubbling.client.ui.drawing.MessageBubble;
 import bubbling.client.ui.model.*;
 import bubbling.client.ui.style.UiFonts;
 import bubbling.common.dto.chat.ChatParticipantDto;
+import bubbling.common.dto.chat.ChatPositionDto;
 import javax.swing.*;
 import javax.swing.text.*;
 import java.awt.*;
@@ -46,6 +47,7 @@ public final class ChatScreen extends JPanel {
     private final JLabel historyHeading = title("", 14), historySubtitle = label("새 메시지가 실시간으로 표시돼요", 11, MUTED),
             emptyHistory = label("아직 대화 기록이 없어요.", 12, MUTED);
     private List<List<UiSession.Message>> visibleSpeech;
+    private final List<JPanel> speechStacks = new java.util.ArrayList<>();
     private final java.util.Map<UiSession.Message, MessageBubble> speechBubbles = new java.util.IdentityHashMap<>();
     private static final DateTimeFormatter MESSAGE_TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault());
     public ChatScreen(UiData data, Runnable back) {
@@ -57,7 +59,10 @@ public final class ChatScreen extends JPanel {
         header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, HEADER_LINE),
                 BorderFactory.createEmptyBorder(12, 18, 4, 18)));
         header.setPreferredSize(new Dimension(0, 70));
-        JButton backButton = button("홈으로", false, back);
+        JButton backButton = button("홈으로", false, () -> {
+            scene.resetOwnPosition();
+            back.run();
+        });
         backButton.setIcon(icon("chevron-left"));
         backButton.setFont(font(13, true));
         backButton.putClientProperty("flat", true);
@@ -120,7 +125,9 @@ public final class ChatScreen extends JPanel {
             @Override
             public void mouseClicked(MouseEvent event) {
                 if (SwingUtilities.isLeftMouseButton(event) && current != null && current.joined && !current.ended) {
+                    Point scaled = scene.toScaledPosition(event.getPoint());
                     scene.moveOwnCharacter(event.getPoint());
+                    session.moveCharacter(current, scaled.x, scaled.y);
                     layoutSpeech(scene.getWidth(), scene.getHeight());
                     speech.repaint();
                 }
@@ -314,6 +321,16 @@ public final class ChatScreen extends JPanel {
         return current != null && current.bubbleId.equals(bubbleId);
     }
 
+    public void updateCharacterPosition(ChatPositionDto position) {
+        if (position == null || current == null || current.conversation == null
+                || !current.conversation.chatRoomId().equals(position.chatRoomId()) || current.ended) {
+            return;
+        }
+        scene.moveCharacter(position.chatMemberId(), position.x(), position.y());
+        layoutSpeech(scene.getWidth(), scene.getHeight());
+        speech.repaint();
+    }
+
     public void resetLive() {
         current = null;
         room = null;
@@ -443,6 +460,7 @@ public final class ChatScreen extends JPanel {
         var visibleMessages = messages.stream().flatMap(List::stream).toList();
         speechBubbles.keySet().removeIf(message -> visibleMessages.stream().noneMatch(value -> value == message));
         speech.removeAll();
+        speechStacks.clear();
         if (current != null) {
             for (var senderMessages : messages) {
                 JPanel stack = column();
@@ -461,6 +479,7 @@ public final class ChatScreen extends JPanel {
                     text.setAlignmentX(Component.CENTER_ALIGNMENT);
                     first = false;
                 }
+                speechStacks.add(stack);
                 speech.add(stack);
             }
         }
@@ -471,32 +490,36 @@ public final class ChatScreen extends JPanel {
 
     private void layoutSpeech(int width, int height) {
         speech.setBounds(0, 0, width, height);
-        for (int i = 0; i < speech.getComponentCount(); i++) {
-            Component stack = speech.getComponent(i);
+        for (int i = 0; i < speechStacks.size(); i++) {
+            JPanel stack = speechStacks.get(i);
             Point head = scene.participantHead(i);
             int below = scene.participantBottom(head) + 8;
             boolean placeBelow = head.y < 95 && height - below > head.y;
-            if (stack instanceof Container container) {
-                int bubbleCount = (int) java.util.Arrays.stream(container.getComponents()).filter(MessageBubble.class::isInstance).count();
-                int space = placeBelow ? height - below : head.y - 20;
-                int budget = Math.max(1, (space - Math.max(0, bubbleCount - 1) * 7) / Math.max(1, bubbleCount));
-                for (Component child : container.getComponents()) {
-                    if (child instanceof MessageBubble bubble) {
-                        bubble.setAvailableHeight(budget);
-                    }
+            int bubbleCount = (int) java.util.Arrays.stream(stack.getComponents()).filter(MessageBubble.class::isInstance).count();
+            int space = placeBelow ? height - below : head.y - 20;
+            int budget = Math.max(1, (space - Math.max(0, bubbleCount - 1) * 7) / Math.max(1, bubbleCount));
+            for (Component child : stack.getComponents()) {
+                if (child instanceof MessageBubble bubble) {
+                    bubble.setAvailableHeight(budget);
                 }
             }
             Dimension size = stack.getPreferredSize();
             int x = Math.clamp(head.x - size.width / 2, 0, Math.max(0, width - size.width));
             int y = placeBelow ? below : Math.max(0, head.y - size.height - 10);
             stack.setBounds(x, y, size.width, size.height);
-            if (stack instanceof Container container) {
-                container.doLayout();
-                for (Component child : container.getComponents()) {
-                    if (child instanceof MessageBubble bubble) {
-                        bubble.doLayout();
-                    }
+            stack.doLayout();
+            for (Component child : stack.getComponents()) {
+                if (child instanceof MessageBubble bubble) {
+                    bubble.doLayout();
                 }
+            }
+        }
+        List<Integer> order = scene.paintOrder();
+        int z = 0;
+        for (int j = order.size() - 1; j >= 0; j--) {
+            int idx = order.get(j);
+            if (idx >= 0 && idx < speechStacks.size()) {
+                speech.setComponentZOrder(speechStacks.get(idx), z++);
             }
         }
     }
