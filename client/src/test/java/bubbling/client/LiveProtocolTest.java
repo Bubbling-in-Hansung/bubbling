@@ -39,6 +39,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static bubbling.common.protocol.MessageType.*;
@@ -389,6 +390,60 @@ class LiveProtocolTest {
             application.get().showPage("conversations");
             assertEquals("채팅", chatButton.getAccessibleContext().getAccessibleName());
             NotificationCards.clear(application.get());
+            live.close();
+        });
+    }
+
+    @Test
+    void maintainsConnectionOnMatchingPongAndDisconnectsOnPongTimeout() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var closedCount = new AtomicInteger();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add, closedCount::incrementAndGet);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            assertTrue(live.isPingScheduled());
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("home", application.get().currentPage());
+            live.sendPing();
+            var ping = sent.getLast();
+            assertEquals(PING, ping.type());
+            assertNotNull(ping.requestId());
+            assertTrue(live.isAwaitingPong());
+
+            dispatcher.dispatch(new MessageEnvelope(PONG, "unrelated", null));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(live.isAwaitingPong());
+            String pingId = sent.getLast().requestId();
+            dispatcher.dispatch(new MessageEnvelope(PONG, pingId, null));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertFalse(live.isAwaitingPong());
+            assertEquals(0, closedCount.get());
+            assertEquals("home", application.get().currentPage());
+
+            live.sendPing();
+            assertTrue(live.isAwaitingPong());
+            live.onPongTimeout();
+            assertEquals(1, closedCount.get());
+            assertFalse(live.isPingScheduled());
+            assertFalse(live.isAwaitingPong());
+            assertEquals("login", application.get().currentPage());
+
+            live.disconnected("서버 연결이 끊겼습니다. 앱을 다시 실행해 주세요.");
+            assertEquals(1, closedCount.get());
             live.close();
         });
     }

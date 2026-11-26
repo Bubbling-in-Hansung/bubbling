@@ -48,25 +48,43 @@ public final class LiveSession {
     private static final String LOGIN_ID_FORMAT = "[A-Za-z][A-Za-z0-9]{7,31}";
     private static final String PASSWORD_FORMAT = "(?=.*[A-Za-z])(?=.*[0-9])(?=.*[!@#$%^&*])[A-Za-z0-9!@#$%^&*]{8,64}";
     private static final String NICKNAME_FORMAT = "[가-힣A-Za-z0-9]+(?:\\s[가-힣A-Za-z0-9]+)*";
+    private static final int AUTHENTICATION_TIMEOUT_MS = 10_000;
+    private static final int PING_INTERVAL_MS = 15_000;
+    private static final int PONG_TIMEOUT_MS = 5_000;
     private final Consumer<MessageEnvelope> transport;
+    private final Runnable closeTransport;
     private final JsonCodec codec = new JsonCodec();
     private final Map<String, String> historyRequests = new HashMap<>();
     private final Map<String, String> leaveRequests = new HashMap<>();
     private final Timer authenticationTimeout;
+    private final Timer pingTimer;
+    private final Timer pongTimeout;
     private ApplicationView view;
     private UiSession state;
     private UserDto user;
     private boolean connected;
+    private boolean disconnected;
     private boolean closed;
     private String authId;
     private String logoutId;
+    private String pingId;
     private MessageType authResult;
     private String opening;
 
     public LiveSession(Consumer<MessageEnvelope> transport) {
-        this.transport = transport;
-        authenticationTimeout = new Timer(10000, event -> disconnected("인증 응답이 없습니다. 앱을 다시 실행해 주세요."));
+        this(transport, () -> {});
+    }
+
+    public LiveSession(Consumer<MessageEnvelope> transport, Runnable closeTransport) {
+        this.transport = Objects.requireNonNull(transport);
+        this.closeTransport = Objects.requireNonNull(closeTransport);
+        authenticationTimeout = new Timer(AUTHENTICATION_TIMEOUT_MS,
+                event -> disconnected("인증 응답이 없습니다. 앱을 다시 실행해 주세요."));
         authenticationTimeout.setRepeats(false);
+        pongTimeout = new Timer(PONG_TIMEOUT_MS, event -> onPongTimeout());
+        pongTimeout.setRepeats(false);
+        pingTimer = new Timer(PING_INTERVAL_MS, event -> sendPing());
+        pingTimer.setInitialDelay(PING_INTERVAL_MS);
     }
 
     public void bind(ApplicationView view, UiSession state) {
@@ -115,6 +133,12 @@ public final class LiveSession {
     }
 
     private void registerSystemAndUserHandlers(ClientMessageDispatcher dispatcher) {
+        on(dispatcher, PONG, message -> {
+            if (pingId != null && pingId.equals(message.requestId())) {
+                pingId = null;
+                pongTimeout.stop();
+            }
+        });
         onAuthenticated(dispatcher, INITIAL_STATE, InitialStateDto.class, snapshot -> {
             state.applyInitialState(snapshot);
             view.setOnline(snapshot.onlineUserCnt());
@@ -246,11 +270,17 @@ public final class LiveSession {
     public void connected() {
         if (closed) return;
         connected = true;
+        disconnected = false;
+        stopPing();
+        pingTimer.restart();
         view.authentication(true, "");
     }
 
     public void disconnected(String detail) {
+        if (closed || disconnected) return;
+        disconnected = true;
         connected = false;
+        stopPing();
         user = null;
         logoutId = null;
         opening = null;
@@ -356,9 +386,40 @@ public final class LiveSession {
     public void close() {
         closed = true;
         connected = false;
+        stopPing();
         logoutId = null;
         leaveRequests.clear();
         authenticationTimeout.stop();
+    }
+
+    void sendPing() {
+        if (closed || !connected || pingId != null) return;
+        String id = UUID.randomUUID().toString();
+        pingId = id;
+        transmit(PING, id, null);
+        if (connected && id.equals(pingId)) {
+            pongTimeout.restart();
+        }
+    }
+
+    void onPongTimeout() {
+        if (closed || !connected || pingId == null) return;
+        closeTransport.run();
+        disconnected("서버 응답이 없습니다. 앱을 다시 실행해 주세요.");
+    }
+
+    boolean isPingScheduled() {
+        return pingTimer.isRunning();
+    }
+
+    boolean isAwaitingPong() {
+        return pongTimeout.isRunning() && pingId != null;
+    }
+
+    private void stopPing() {
+        pingId = null;
+        pingTimer.stop();
+        pongTimeout.stop();
     }
 
     private void clearFailedRequest(MessageEnvelope message) {

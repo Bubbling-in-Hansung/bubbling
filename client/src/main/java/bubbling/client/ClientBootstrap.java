@@ -39,7 +39,7 @@ public class ClientBootstrap {
                 config.getPort(),
                 dispatcher
         );
-        LiveSession session = new LiveSession(client::send);
+        LiveSession session = new LiveSession(client::send, client::close);
         session.registerHandlers(dispatcher);
         dispatcher.onDisconnect(() -> {
             client.close();
