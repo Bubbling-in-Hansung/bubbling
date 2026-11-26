@@ -231,6 +231,12 @@ public class ServerComponent {
                 true,
                 handler::position
         );
+
+        messageDispatcher.register(
+                MessageType.CHAT_MUSIC_SET,
+                true,
+                handler::music
+        );
     }
 
     private void registerChatRequestHandlers() {

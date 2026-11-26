@@ -4,6 +4,7 @@ import bubbling.common.enums.ChatRoomStatus;
 import bubbling.server.exception.BaseException;
 import bubbling.server.exception.code.ChatRoomExceptionCode;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -14,6 +15,7 @@ public class ChatRoom {
     private ChatRoomStatus status = ChatRoomStatus.ACTIVE;
     private final LocalDateTime createdAt = LocalDateTime.now();
     private LocalDateTime endedAt;
+    private String musicUrl;
 
     private ChatRoom(Bubble bubble) {
         this.bubble = bubble;
@@ -55,6 +57,18 @@ public class ChatRoom {
 
     public LocalDateTime getEndedAt() {
         return endedAt;
+    }
+
+    public String getMusicUrl() {
+        return musicUrl;
+    }
+
+    public void setMusicUrl(String musicUrl) {
+        if (musicUrl != null && !URI.create(musicUrl).isAbsolute()) {
+            throw new BaseException(ChatRoomExceptionCode.INVALID_MUSIC_URL);
+        }
+
+        this.musicUrl = musicUrl;
     }
 
     @Override
