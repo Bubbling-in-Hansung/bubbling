@@ -188,7 +188,7 @@ public class ServerComponent {
         );
 
         messageDispatcher.register(
-                MessageType.BUBBLE_DETAIL,
+                MessageType.BUBBLE_DETAIL_REQUEST,
                 true,
                 handler::detail
         );
