@@ -42,9 +42,9 @@ public final class MessageBubble extends JPanel {
         setOpaque(false);
         setLayout(null);
         String prefix = mine ? (historyStyle ? "p_r_" : "p_c_") : "w_";
-        topImage = image(prefix + "top.png");
-        bodyImage = image(prefix + "center.png");
-        bottomImage = image(mine ? prefix + "bottom.png" : (historyStyle ? "w_l_bottom.png" : "w_c_bottom.png"));
+        topImage = slice(prefix + "top.png");
+        bodyImage = slice(prefix + "center.png");
+        bottomImage = slice(mine ? prefix + "bottom.png" : (historyStyle ? "w_l_bottom.png" : "w_c_bottom.png"));
         setFont(font(11, false));
         FontMetrics metrics = getFontMetrics(getFont());
         fullLines = MessageText.lines(message, metrics::stringWidth, MAX_TEXT_WIDTH);
@@ -108,7 +108,7 @@ public final class MessageBubble extends JPanel {
         updateSize();
     }
 
-    private static BufferedImage image(String name) {
+    static BufferedImage slice(String name) {
         if (IMAGES.containsKey(name)) {
             return IMAGES.get(name);
         }
