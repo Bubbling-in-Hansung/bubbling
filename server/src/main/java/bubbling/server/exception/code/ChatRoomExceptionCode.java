@@ -12,7 +12,8 @@ public enum ChatRoomExceptionCode implements ExceptionCode {
     FAILED_TO_CREATION("CHAT_ROOM_007", "채팅방 생성에 실패했습니다."),
     ALREADY_EXISTS("CHAT_ROOM_008", "채팅방이 이미 존재합니다."),
     FORBIDDEN("CHAT_ROOM_009", "채팅방에 대한 권한이 없습니다."),
-    INVALID_COORDINATE("CHAT_ROOM_010", "유효하지 않은 좌표입니다.");
+    INVALID_COORDINATE("CHAT_ROOM_010", "유효하지 않은 좌표입니다."),
+    INVALID_MUSIC_URL("CHAT_ROOM_011", "유효하지 않은 URL입니다.");
 
     private final String code;
     private final String message;

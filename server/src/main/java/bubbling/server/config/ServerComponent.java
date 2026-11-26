@@ -188,7 +188,7 @@ public class ServerComponent {
         );
 
         messageDispatcher.register(
-                MessageType.BUBBLE_DETAIL,
+                MessageType.BUBBLE_DETAIL_REQUEST,
                 true,
                 handler::detail
         );
@@ -230,6 +230,12 @@ public class ServerComponent {
                 MessageType.CHAT_POSITION_REQUEST,
                 true,
                 handler::position
+        );
+
+        messageDispatcher.register(
+                MessageType.CHAT_MUSIC_SET,
+                true,
+                handler::music
         );
     }
 
