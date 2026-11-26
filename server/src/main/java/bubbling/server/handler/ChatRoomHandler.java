@@ -257,4 +257,39 @@ public class ChatRoomHandler {
                 .toList();
         messageSender.sendAllTarget(users, event);
     }
+
+    public void music(ClientConnection connection, MessageEnvelope message) {
+        ChatMusicDto request = jsonCodec.fromPayload(
+                message.payload(),
+                ChatMusicDto.class
+        );
+
+        User user = connection.requireAuthenticatedUser();
+        ChatRoom chatRoom = chatRoomService.findById(request.chatRoomId());
+
+        if(!chatRoom.getBubble().getOwner().equals(user)) {
+            throw new BaseException(ChatRoomExceptionCode.FORBIDDEN);
+        }
+
+        if(!chatRoom.isActive()) {
+            throw new BaseException(ChatRoomExceptionCode.ENDED);
+        }
+
+        chatRoom.setMusicUrl(request.musicUrl());
+
+        ChatMusicDto payload = new ChatMusicDto(
+                chatRoom.getId(),
+                chatRoom.getMusicUrl()
+        );
+        MessageEnvelope event = new MessageEnvelope(
+                MessageType.CHAT_MUSIC_CHANGED,
+                null,
+                jsonCodec.toPayload(payload)
+        );
+        List<User> users = chatMemberService.findAllActiveJoinMemberByChatRoom(chatRoom)
+                .stream()
+                .map(ChatMember::getUser)
+                .toList();
+        messageSender.sendAllTarget(users, event);
+    }
 }

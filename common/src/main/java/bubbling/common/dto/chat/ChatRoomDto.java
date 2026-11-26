@@ -13,5 +13,6 @@ public record ChatRoomDto(
         boolean isOwner,
         List<ChatParticipantDto> participants,
         String createdAt,
-        String endedAt
+        String endedAt,
+        String musicUrl
 ) {}

@@ -66,6 +66,10 @@ public enum MessageType {
     MY_CHAT_ROOM_LIST_REQUEST,
     MY_CHAT_ROOM_LIST,
 
+    // 채팅방 음악
+    CHAT_MUSIC_SET,
+    CHAT_MUSIC_CHANGED,
+
     // 채팅 메시지
     CHAT_MESSAGE,
     CHAT_HISTORY_REQUEST,
