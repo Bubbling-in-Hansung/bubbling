@@ -48,7 +48,7 @@ public class SearchMaxStrategy implements GameResultSearchStrategy {
                     UserMapper.toDto(result.getUser()),
                     result.getType(),
                     result.getScore(),
-                    result.getCreatedAt()
+                    result.getCreatedAt().toString()
             ));
         }
 
