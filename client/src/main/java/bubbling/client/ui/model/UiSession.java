@@ -41,6 +41,7 @@ public final class UiSession {
         public final List<Message> messages = Collections.unmodifiableList(messageLog);
         private final Map<String, ChatMessageDto> received = new LinkedHashMap<>();
         private final Map<String, Deque<Message>> recentSpeechByMember = new HashMap<>();
+        private final Set<String> typingMembers = new HashSet<>();
         private Instant lastActivityAt;
         Room(String id, RoomView view) {
             this.id = id;
@@ -157,6 +158,15 @@ public final class UiSession {
         room.listed = true;
         room.joined = chat.status() == ChatRoomStatus.ACTIVE && chat.myMemberId() != null;
         room.ended = chat.status() == ChatRoomStatus.ENDED;
+        if (room.ended) {
+            room.typingMembers.clear();
+        } else if (chat.participants() != null) {
+            Set<String> activeIds = new HashSet<>();
+            for (ChatParticipantDto participant : chat.participants()) {
+                activeIds.add(participant.chatMemberId());
+            }
+            room.typingMembers.retainAll(activeIds);
+        }
         return room;
     }
 
@@ -189,6 +199,7 @@ public final class UiSession {
         room.ended = true;
         room.joined = false;
         room.people = 0;
+        room.typingMembers.clear();
     }
 
     public void markBubbleRemoved(BubbleRemovedEvent event) {
@@ -287,8 +298,22 @@ public final class UiSession {
     public Room applyMessage(ChatMessageDto message) {
         Room room = chatRoom(message.chatRoomId());
         if (room == null || room.received.putIfAbsent(message.chatMessageId(), message) != null) return null;
+        if (message.senderMemberId() != null) {
+            room.typingMembers.remove(message.senderMemberId());
+        }
         room.recordMessage(messageView(room, message));
         return room;
+    }
+
+    public void applyTyping(ChatTypingDto event) {
+        if (event == null || event.chatRoomId() == null || event.chatMemberId() == null) return;
+        Room room = chatRoom(event.chatRoomId());
+        if (room == null || room.ended || event.chatMemberId().equals(room.myMemberId)) return;
+        if (event.typing()) {
+            room.typingMembers.add(event.chatMemberId());
+        } else {
+            room.typingMembers.remove(event.chatMemberId());
+        }
     }
 
     public Room chatRoom(String chatId) {
@@ -462,6 +487,17 @@ public final class UiSession {
     public void moveCharacter(Room r, int x, int y) {
         if (r == null || r.conversation == null || r.conversation.myMemberId() == null) return;
         liveRequests.moveCharacter(r.conversation.chatRoomId(), r.conversation.myMemberId(), x, y);
+    }
+
+    public void setTyping(Room r, boolean typing) {
+        if (r == null || r.ended || !r.joined || r.conversation == null || r.conversation.myMemberId() == null) {
+            return;
+        }
+        liveRequests.sendTyping(r.conversation.chatRoomId(), r.conversation.myMemberId(), typing);
+    }
+
+    public boolean isTyping(Room r, String memberId) {
+        return r != null && !r.ended && memberId != null && r.typingMembers.contains(memberId);
     }
 
     public List<Message> speech(Room r, String memberId) {

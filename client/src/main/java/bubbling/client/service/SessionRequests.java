@@ -15,6 +15,7 @@ import bubbling.common.dto.chat.ChatMessageRequest;
 import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestCreateRequest;
 import bubbling.common.dto.chat.ChatRequestDecisionRequest;
+import bubbling.common.dto.chat.ChatTypingDto;
 import bubbling.common.enums.BubbleCategory;
 import bubbling.common.enums.BubbleMethod;
 import bubbling.common.protocol.MessageType;
@@ -88,6 +89,10 @@ public final class SessionRequests {
 
     public void moveCharacter(String roomId, String memberId, int x, int y) {
         send.accept(CHAT_POSITION_REQUEST, new ChatPositionDto(roomId, memberId, x, y));
+    }
+
+    public void sendTyping(String roomId, String memberId, boolean typing) {
+        send.accept(CHAT_TYPING, new ChatTypingDto(roomId, memberId, typing));
     }
 
     private static BubbleCategory category(RoomView room) {
