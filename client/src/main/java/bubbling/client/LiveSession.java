@@ -161,6 +161,10 @@ public final class LiveSession {
             state.updateReactionCount(reaction.bubbleId(), reaction.reactionCount());
             view.refreshLiveState();
         });
+        onAuthenticated(dispatcher, BUBBLE_DETAIL, BubbleDto.class, bubble -> {
+            state.applyBubble(bubble);
+            view.refreshLiveState();
+        });
         onAuthenticated(dispatcher, BUBBLE_REMOVED, BubbleRemovedEvent.class, event -> {
             state.markBubbleRemoved(event);
             if (event.status() == BubbleStatus.DELETED) {

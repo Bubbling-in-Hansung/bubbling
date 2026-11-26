@@ -370,6 +370,10 @@ public final class UiSession {
         if (canReact(room)) liveRequests.reactToBubble(room.bubbleId);
     }
 
+    public void requestDetail(Room room) {
+        if (room != null && !room.deleted) liveRequests.requestBubbleDetail(room.bubbleId);
+    }
+
     public List<Request> requests() {
         return List.copyOf(requests);
     }

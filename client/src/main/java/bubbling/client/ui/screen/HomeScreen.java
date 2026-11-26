@@ -129,6 +129,7 @@ public final class HomeScreen extends JPanel {
                         automatic = false;
                         detailState = null;
                         detail.setVisible(true);
+                        session.requestDetail(r);
                         renderDetail();
                     });
                     bubbleButtons.put(r.id, b);

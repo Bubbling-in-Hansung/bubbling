@@ -7,6 +7,7 @@ import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.model.UiData;
 import bubbling.common.codec.JsonCodec;
 import bubbling.common.dto.auth.LoginResponse;
+import bubbling.common.dto.bubble.BubbleDetailRequest;
 import bubbling.common.dto.bubble.BubbleDto;
 import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.bubble.BubbleUpdateRequest;
@@ -444,6 +445,49 @@ class LiveProtocolTest {
 
             live.disconnected("서버 연결이 끊겼습니다. 앱을 다시 실행해 주세요.");
             assertEquals(1, closedCount.get());
+            live.close();
+        });
+    }
+
+    @Test
+    void requestsAndAppliesBubbleDetail() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+            dispatcher.dispatch(new MessageEnvelope(INITIAL_STATE, "init",
+                    codec.toPayload(new InitialStateDto(List.of(bubble("shared")), 1))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            var room = data.session().room("shared");
+            data.session().requestDetail(room);
+            var detailReq = sent.getLast();
+            assertEquals(BUBBLE_DETAIL_REQUEST, detailReq.type());
+            assertEquals(new BubbleDetailRequest("shared"),
+                    codec.fromPayload(detailReq.payload(), BubbleDetailRequest.class));
+
+            var detailed = new BubbleDto("shared", "최신 고민 제목", BubbleCategory.CAREER, BubbleMethod.SOLUTION,
+                    4, 3, true, BubbleStatus.ALIVE, 7, "2026-11-23T00:00:00", "2099-01-02T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(BUBBLE_DETAIL, detailReq.requestId(), codec.toPayload(detailed)));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            var room = data.session().room("shared");
+            assertEquals("최신 고민 제목", room.view.title());
+            assertEquals(3, room.people);
+            assertEquals(7, room.reactionCount);
+            assertEquals(LocalDateTime.parse("2099-01-02T00:00:00").atZone(ZoneId.systemDefault()).toInstant(),
+                    room.expiresAt);
             live.close();
         });
     }
