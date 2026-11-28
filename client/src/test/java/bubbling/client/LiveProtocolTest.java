@@ -6,6 +6,13 @@ import bubbling.client.ui.dialog.NotificationCards;
 import bubbling.client.ui.drawing.MessageBubble;
 import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.drawing.TypingBubble;
+import bubbling.client.ui.game.CatchFavoriteGamePanel;
+import bubbling.client.ui.game.DinoRunGamePanel;
+import bubbling.client.ui.game.DinoSprites;
+import bubbling.client.ui.game.GameGuidePanel;
+import bubbling.client.ui.game.GameLobbyPanel;
+import bubbling.client.ui.game.GameRankingPanel;
+import bubbling.client.ui.game.GameView;
 import bubbling.client.ui.model.UiData;
 import bubbling.client.ui.screen.ChatScreen;
 import bubbling.common.codec.JsonCodec;
@@ -22,6 +29,10 @@ import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRoomDto;
 import bubbling.common.dto.chat.ChatRequestDto;
 import bubbling.common.dto.chat.ChatTypingDto;
+import bubbling.common.dto.game.GameRankingData;
+import bubbling.common.dto.game.GameRankingRequest;
+import bubbling.common.dto.game.GameRankingResponse;
+import bubbling.common.dto.game.GameResultRequest;
 import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.user.UserDto;
@@ -31,11 +42,14 @@ import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRoomStatus;
 import bubbling.common.enums.ChatRequestRole;
 import bubbling.common.enums.ChatRequestStatus;
+import bubbling.common.enums.GameRankingType;
+import bubbling.common.enums.GameType;
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageEnvelope;
 import org.junit.jupiter.api.Test;
 
 import javax.swing.JButton;
+import javax.swing.JLabel;
 import javax.swing.JRootPane;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
@@ -45,6 +59,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -581,6 +596,260 @@ class LiveProtocolTest {
             assertNull(findComponent(application.get(), TypingBubble.class));
             live.close();
         });
+    }
+
+    @Test
+    void supportsMiniGameEntryGuideCharacterSwitchAndResultSaving() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+        var gameRoot = new AtomicReference<JRootPane>();
+        var gameViewRef = new AtomicReference<GameView>();
+        var reloggedViewRef = new AtomicReference<GameView>();
+        var closed = new AtomicBoolean(false);
+        var rankingPanelRef = new AtomicReference<GameRankingPanel>();
+        var lobbyRef = new AtomicReference<GameLobbyPanel>();
+        var dinoRankingResp = new AtomicReference<GameRankingResponse>();
+        var catchRankingResp = new AtomicReference<GameRankingResponse>();
+        var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.FOX, "2026-11-23T00:00:00");
+        var peer = new UserDto("user-2", "peer1234", "상대방", ProfileCharacter.CAT, "2026-11-23T00:00:00");
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(DinoSprites.isLoaded());
+            assertNotNull(findButton(application.get(), "게임"));
+
+            var root = new JRootPane();
+            var gameView = new GameView(data.session(), () -> closed.set(true));
+            root.setSize(880, 640);
+            root.setContentPane(gameView);
+            root.doLayout();
+            gameRoot.set(root);
+            gameViewRef.set(gameView);
+
+            GameLobbyPanel lobby = findComponent(gameView, GameLobbyPanel.class);
+            assertNotNull(lobby);
+            lobbyRef.set(lobby);
+            assertTrue(lobby.isVisible());
+            assertEquals("여우", lobby.selectedCharacter().label());
+
+            JButton guideButton = findButton(lobby, "게임 방법");
+            JButton rankingButton = findButton(lobby, "랭킹 확인");
+            JButton startButton = findButton(lobby, "게임 시작");
+            JButton lobbyExitButton = findButton(lobby, "게임 종료");
+            assertNotNull(guideButton);
+            assertNotNull(rankingButton);
+            assertNotNull(startButton);
+            assertNotNull(lobbyExitButton);
+
+            rankingButton.doClick();
+            GameRankingPanel ranking = findComponent(gameView, GameRankingPanel.class);
+            assertNotNull(ranking);
+            rankingPanelRef.set(ranking);
+            assertTrue(ranking.isVisible());
+            var req1 = sent.getLast();
+            assertEquals(GAME_RANKING_REQUEST, req1.type());
+            assertEquals(new GameRankingRequest(GameRankingType.MAX, GameType.DINOSAUR_RUN, 1000),
+                    codec.fromPayload(req1.payload(), GameRankingRequest.class));
+
+            findButton(ranking, "좋아하는 아이템 잡기").doClick();
+            assertEquals(new GameRankingRequest(GameRankingType.MAX, GameType.CATCH_FAVORITE, 1000),
+                    codec.fromPayload(sent.getLast().payload(), GameRankingRequest.class));
+            findButton(ranking, "누적 점수").doClick();
+            assertEquals(new GameRankingRequest(GameRankingType.SUM, GameType.CATCH_FAVORITE, 1000),
+                    codec.fromPayload(sent.getLast().payload(), GameRankingRequest.class));
+            findButton(ranking, "평균 점수").doClick();
+            assertEquals(new GameRankingRequest(GameRankingType.AVERAGE, GameType.CATCH_FAVORITE, 1000),
+                    codec.fromPayload(sent.getLast().payload(), GameRankingRequest.class));
+
+            findButton(ranking, "공룡 달리기").doClick();
+            findButton(ranking, "최고 점수").doClick();
+            var dinoRankReq = sent.getLast();
+            assertEquals(new GameRankingRequest(GameRankingType.MAX, GameType.DINOSAUR_RUN, 1000),
+                    codec.fromPayload(dinoRankReq.payload(), GameRankingRequest.class));
+
+            var resp = new GameRankingResponse(
+                    GameRankingType.MAX,
+                    List.of(
+                            new GameRankingData(1, user, GameType.DINOSAUR_RUN, 420, "2026-11-28T12:00:00"),
+                            new GameRankingData(2, peer, GameType.DINOSAUR_RUN, 190, "2026-11-28T11:30:00")),
+                    "2026-11-28T12:05:00");
+            dinoRankingResp.set(resp);
+            dispatcher.dispatch(new MessageEnvelope(GAME_RANKING, dinoRankReq.requestId(), codec.toPayload(resp)));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(420, data.session().bestScore(GameType.DINOSAUR_RUN));
+            GameRankingPanel ranking = rankingPanelRef.get();
+            GameLobbyPanel lobby = lobbyRef.get();
+            GameView gameView = gameViewRef.get();
+            gameView.onRankingLoaded(GameType.DINOSAUR_RUN, dinoRankingResp.get());
+
+            assertTrue(containsLabel(ranking, "1위 · 420점"));
+            assertTrue(containsLabel(ranking, "테스터 (나)"));
+            assertTrue(containsLabel(ranking, "상대방"));
+            assertNotNull(findButton(ranking, "게임 종료"));
+
+            findButton(ranking, "게임 선택으로").doClick();
+            assertTrue(lobby.isVisible());
+            assertTrue(containsLabel(lobby, "내 최고 점수: 420점"));
+
+            findButton(lobby, "게임 방법").doClick();
+            GameGuidePanel guide = findComponent(gameView, GameGuidePanel.class);
+            assertNotNull(guide);
+            assertTrue(guide.isVisible());
+            assertFalse(lobby.isVisible());
+            assertNotNull(findButton(guide, "게임 종료"));
+
+            findButton(guide, "게임 선택으로").doClick();
+            assertTrue(lobby.isVisible());
+
+            JButton startButton = findButton(lobby, "게임 시작");
+            assertEquals(GameType.DINOSAUR_RUN, lobby.selectedGame());
+            startButton.doClick();
+            DinoRunGamePanel dinoPanel = findComponent(gameView, DinoRunGamePanel.class);
+            assertNotNull(dinoPanel);
+            assertTrue(dinoPanel.isVisible());
+            assertTrue(dinoPanel.isRunning());
+            JButton dinoBackButton = findButton(dinoPanel, "게임 선택");
+            JButton dinoExitButton = findButton(dinoPanel, "게임 종료");
+            JButton dinoRankingButton = findButton(dinoPanel, "랭킹 확인");
+            JButton dinoRestartButton = findButton(dinoPanel, "다시 하기");
+            assertNotNull(dinoBackButton);
+            assertNotNull(dinoExitButton);
+            assertNotNull(dinoRankingButton);
+            assertNotNull(dinoRestartButton);
+            assertFalse(dinoBackButton.isFocusable());
+            assertFalse(dinoExitButton.isFocusable());
+            assertFalse(dinoRankingButton.isFocusable());
+            assertFalse(dinoRestartButton.isFocusable());
+            dinoBackButton.doClick();
+            assertFalse(dinoPanel.isRunning());
+            assertTrue(lobby.isVisible());
+
+            findButton(lobby, "펭귄").doClick();
+            assertEquals(GameType.CATCH_FAVORITE, lobby.selectedGame());
+            assertEquals("펭귄", lobby.selectedCharacter().label());
+
+            startButton.doClick();
+            CatchFavoriteGamePanel catchPanel = findComponent(gameView, CatchFavoriteGamePanel.class);
+            assertNotNull(catchPanel);
+            assertTrue(catchPanel.isVisible());
+            assertTrue(catchPanel.isRunning());
+            assertNotNull(findButton(catchPanel, "게임 종료"));
+            assertNotNull(findByAccessibleName(catchPanel, "펭귄 ♥ 물고기"));
+
+            assertTrue(CatchFavoriteGamePanel.spawnIntervalForProgress(0.0)
+                    > CatchFavoriteGamePanel.spawnIntervalForProgress(0.5));
+            assertTrue(CatchFavoriteGamePanel.spawnIntervalForProgress(0.5)
+                    > CatchFavoriteGamePanel.spawnIntervalForProgress(1.0));
+            assertTrue(CatchFavoriteGamePanel.maxItemsForProgress(0.0)
+                    < CatchFavoriteGamePanel.maxItemsForProgress(0.5));
+            assertTrue(CatchFavoriteGamePanel.maxItemsForProgress(0.5)
+                    < CatchFavoriteGamePanel.maxItemsForProgress(1.0));
+            assertTrue(CatchFavoriteGamePanel.minLifetimeForProgress(0.0)
+                    > CatchFavoriteGamePanel.minLifetimeForProgress(0.5));
+            assertTrue(CatchFavoriteGamePanel.minLifetimeForProgress(0.5)
+                    > CatchFavoriteGamePanel.minLifetimeForProgress(1.0));
+            assertTrue(CatchFavoriteGamePanel.minLifetimeForProgress(1.0) >= 300L);
+            assertTrue(CatchFavoriteGamePanel.spawnIntervalForProgress(1.0) <= 80L);
+            assertTrue(CatchFavoriteGamePanel.maxItemsForProgress(1.0) >= 30);
+
+            findButton(catchPanel, "게임 선택").doClick();
+            assertFalse(catchPanel.isRunning());
+            assertTrue(lobby.isVisible());
+
+            assertFalse(closed.get());
+            findButton(lobby, "게임 종료").doClick();
+            assertTrue(closed.get());
+
+            data.session().saveGameResult(GameType.DINOSAUR_RUN, 180);
+            var dinoResult = sent.getLast();
+            assertEquals(GAME_RESULT_REQUEST, dinoResult.type());
+            assertEquals(new GameResultRequest(GameType.DINOSAUR_RUN, 180),
+                    codec.fromPayload(dinoResult.payload(), GameResultRequest.class));
+
+            data.session().saveGameResult(GameType.CATCH_FAVORITE, -10);
+            var clampedResult = sent.getLast();
+            assertEquals(GAME_RESULT_REQUEST, clampedResult.type());
+            assertEquals(new GameResultRequest(GameType.CATCH_FAVORITE, 0),
+                    codec.fromPayload(clampedResult.payload(), GameResultRequest.class));
+
+            dispatcher.dispatch(new MessageEnvelope(GAME_RESULT_SAVED, dinoResult.requestId(), null));
+            gameView.onResultSaved();
+            assertNotNull(findByAccessibleName(gameRoot.get().getLayeredPane(), "점수 저장 완료"));
+
+            live.logout();
+            var logoutMsg = sent.getLast();
+            assertEquals(LOGOUT, logoutMsg.type());
+            dispatcher.dispatch(new MessageEnvelope(LOGOUT_RESULT, logoutMsg.requestId(), null));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(0, data.session().bestScore(GameType.DINOSAUR_RUN));
+            assertEquals(0, data.session().bestScore(GameType.CATCH_FAVORITE));
+            assertNull(data.session().currentUserId());
+
+            live.authenticate(false, "tester123", "password", "");
+            String reloginId = sent.getLast().requestId();
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, reloginId, codec.toPayload(new LoginResponse(user))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals("user-1", data.session().currentUserId());
+            int beforeCount = sent.size();
+            var reloggedView = new GameView(data.session(), () -> {});
+            reloggedViewRef.set(reloggedView);
+            reloggedView.refreshBestScores();
+
+            var refreshed = sent.subList(beforeCount, sent.size()).stream()
+                    .filter(msg -> msg.type() == GAME_RANKING_REQUEST)
+                    .toList();
+            assertEquals(2, refreshed.size());
+
+            var catchResp = new GameRankingResponse(
+                    GameRankingType.MAX,
+                    List.of(new GameRankingData(1, user, GameType.CATCH_FAVORITE, 310, "2026-11-28T12:10:00")),
+                    "2026-11-28T12:15:00");
+            catchRankingResp.set(catchResp);
+
+            for (MessageEnvelope req : refreshed) {
+                GameRankingRequest parsed = codec.fromPayload(req.payload(), GameRankingRequest.class);
+                GameRankingResponse payload = parsed.gameType() == GameType.DINOSAUR_RUN
+                        ? dinoRankingResp.get() : catchResp;
+                dispatcher.dispatch(new MessageEnvelope(GAME_RANKING, req.requestId(), codec.toPayload(payload)));
+            }
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertEquals(420, data.session().bestScore(GameType.DINOSAUR_RUN));
+            assertEquals(310, data.session().bestScore(GameType.CATCH_FAVORITE));
+
+            GameView reloggedView = reloggedViewRef.get();
+            reloggedView.onRankingLoaded(GameType.DINOSAUR_RUN, dinoRankingResp.get());
+            reloggedView.onRankingLoaded(GameType.CATCH_FAVORITE, catchRankingResp.get());
+            assertTrue(containsLabel(reloggedView, "내 최고 점수: 420점"));
+            assertTrue(containsLabel(reloggedView, "내 최고 점수: 310점"));
+
+            gameViewRef.get().stopAllGames();
+            reloggedView.stopAllGames();
+            NotificationCards.clear(gameRoot.get());
+            live.close();
+        });
+    }
+
+    private static boolean containsLabel(Container root, String text) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JLabel label && text.equals(label.getText())) return true;
+            if (child instanceof Container nested && containsLabel(nested, text)) return true;
+        }
+        return false;
     }
 
     private static JButton findButton(Container root, String text) {

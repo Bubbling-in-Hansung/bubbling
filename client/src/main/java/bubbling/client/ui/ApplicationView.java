@@ -4,14 +4,20 @@ import bubbling.client.LiveSession;
 import bubbling.client.ui.dialog.NotificationCards;
 import bubbling.common.dto.chat.ChatParticipantDto;
 import bubbling.common.dto.chat.ChatPositionDto;
+import bubbling.common.dto.game.GameRankingResponse;
 import bubbling.common.dto.user.UserDto;
+import bubbling.common.enums.GameType;
 import bubbling.client.ui.model.*;
+import bubbling.client.ui.game.GameFrame;
+import bubbling.client.ui.game.GameView;
 import bubbling.client.ui.screen.*;
 import bubbling.client.ui.drawing.CharacterArt;
 import bubbling.client.ui.style.UiFonts;
 import static bubbling.client.ui.model.UiPages.*;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -35,7 +41,10 @@ public final class ApplicationView extends JPanel {
     private final CardLayout shellPages = new CardLayout();
     private final JPanel shellDeck = new JPanel(shellPages);
     private String currentPage = "";
-    private JButton homeButton, chatButton;
+    private JButton homeButton, chatButton, gameButton;
+    private GameFrame gameFrame;
+    private GameView gameView;
+    private Window observedMainWindow;
     private final Set<String> seenMemberEvents = new HashSet<>();
     private final Map<String, String> unopenedRoomNotices = new HashMap<>();
     private final Map<String, Integer> unreadNoticesByRoom = new HashMap<>();
@@ -195,6 +204,19 @@ public final class ApplicationView extends JPanel {
         chatButton.setMaximumSize(new Dimension(58, 56));
         chatButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         top.add(chatButton);
+        top.add(Box.createVerticalStrut(10));
+        gameButton = button("게임", false, this::openGameWindow);
+        gameButton.setIcon(sidebarIcon("game", () -> 0));
+        gameButton.setMargin(new Insets(0, 0, 0, 0));
+        gameButton.setVerticalTextPosition(SwingConstants.BOTTOM);
+        gameButton.setHorizontalTextPosition(SwingConstants.CENTER);
+        gameButton.setFont(font(9, false));
+        gameButton.putClientProperty("flat", true);
+        gameButton.setPreferredSize(new Dimension(58, 56));
+        gameButton.setMaximumSize(new Dimension(58, 56));
+        gameButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        gameButton.getAccessibleContext().setAccessibleName("게임");
+        top.add(gameButton);
         sidebar.add(top, BorderLayout.NORTH);
         JPanel bottom = column();
         pad(bottom, 10);
@@ -421,10 +443,95 @@ public final class ApplicationView extends JPanel {
     }
 
     public void updateAccount(UserDto user) {
-        data.session().applyProfile(user == null ? null : user.profile());
+        data.session().applyAccount(user);
         nickname.setText(user == null ? "" : user.nickname() + "님");
         profileScreen.setAccount(user);
+        if (gameView != null) {
+            gameView.syncProfileCharacter(CharacterChoice.at(data.session().character()));
+        }
         repaint();
+    }
+
+    public void openGameWindow() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            throw new IllegalStateException("Use EDT");
+        }
+        attachMainWindowCloseHook();
+        if (gameFrame != null && gameFrame.isDisplayable() && gameView != null) {
+            gameView.syncProfileCharacter(CharacterChoice.at(data.session().character()));
+            gameView.refreshBestScores();
+            gameFrame.setExtendedState(Frame.NORMAL);
+            gameFrame.setVisible(true);
+            gameFrame.toFront();
+            gameFrame.requestFocus();
+            return;
+        }
+        GameView createdView = new GameView(data.session(), this::closeGameWindow);
+        GameFrame createdFrame = new GameFrame(createdView, SwingUtilities.getWindowAncestor(this));
+        createdFrame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                if (gameView == createdView) {
+                    createdView.stopAllGames();
+                    gameView = null;
+                }
+                if (gameFrame == createdFrame) {
+                    gameFrame = null;
+                }
+            }
+        });
+        gameView = createdView;
+        gameFrame = createdFrame;
+        createdView.refreshBestScores();
+        createdFrame.setVisible(true);
+    }
+
+    public void closeGameWindow() {
+        GameFrame frame = gameFrame;
+        GameView view = gameView;
+        gameFrame = null;
+        gameView = null;
+        if (view != null) {
+            view.stopAllGames();
+        }
+        if (frame != null && frame.isDisplayable()) {
+            frame.dispose();
+        }
+    }
+
+    private void attachMainWindowCloseHook() {
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window == null || window == observedMainWindow) return;
+        observedMainWindow = window;
+        window.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                closeGameWindow();
+            }
+
+            @Override
+            public void windowClosed(WindowEvent e) {
+                closeGameWindow();
+            }
+        });
+    }
+
+    public void gameResultSaved() {
+        if (gameView != null) {
+            gameView.onResultSaved();
+        }
+    }
+
+    public void gameRankingLoaded(GameType gameType, GameRankingResponse response) {
+        if (gameView != null) {
+            gameView.onRankingLoaded(gameType, response);
+        }
+    }
+
+    public Component notificationTarget() {
+        return gameFrame != null && gameFrame.isShowing() && gameFrame.isActive() && gameView != null
+                ? gameView
+                : this;
     }
 
     public void passwordChanged() {
@@ -464,6 +571,7 @@ public final class ApplicationView extends JPanel {
     }
 
     public void resetLiveState() {
+        closeGameWindow();
         seenMemberEvents.clear();
         unopenedRoomNotices.clear();
         unreadNoticesByRoom.clear();

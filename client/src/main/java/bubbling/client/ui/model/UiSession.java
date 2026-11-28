@@ -6,9 +6,14 @@ import bubbling.common.enums.ChatRequestRole;
 import bubbling.common.dto.bubble.BubbleDto;
 import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.chat.*;
+import bubbling.common.dto.game.GameRankingData;
+import bubbling.common.dto.game.GameRankingResponse;
 import bubbling.common.dto.system.InitialStateDto;
+import bubbling.common.dto.user.UserDto;
 import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRoomStatus;
+import bubbling.common.enums.GameRankingType;
+import bubbling.common.enums.GameType;
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageType;
 import java.time.*;
@@ -113,6 +118,8 @@ public final class UiSession {
     private final Map<String, Instant> retry = new HashMap<>();
     private final Set<String> rejected = new HashSet<>();
     private final Set<String> ownedBubbles = new HashSet<>();
+    private final EnumMap<GameType, Integer> bestScores = new EnumMap<>(GameType.class);
+    private String currentUserId;
     private String recent;
     private int character;
     public UiSession(Clock clock, BiConsumer<MessageType, Object> transport) {
@@ -354,6 +361,8 @@ public final class UiSession {
         requests.clear();
         rejected.clear();
         retry.clear();
+        bestScores.clear();
+        currentUserId = null;
         recent = null;
         character = 0;
     }
@@ -525,8 +534,39 @@ public final class UiSession {
         return character;
     }
 
+    public String currentUserId() {
+        return currentUserId;
+    }
+
+    public void applyAccount(UserDto user) {
+        currentUserId = user == null ? null : user.id();
+        applyProfile(user == null ? null : user.profile());
+    }
+
     public void applyProfile(ProfileCharacter profile) {
         character = CharacterChoice.indexOf(profile);
+    }
+
+    public int bestScore(GameType gameType) {
+        return gameType == null ? 0 : bestScores.getOrDefault(gameType, 0);
+    }
+
+    public void recordLocalScore(GameType gameType, int score) {
+        if (gameType == null) return;
+        bestScores.merge(gameType, Math.max(0, score), Math::max);
+    }
+
+    public void applyGameRanking(GameType gameType, GameRankingResponse response) {
+        if (response == null || response.rankingType() != GameRankingType.MAX
+                || gameType == null || currentUserId == null || response.rankings() == null) {
+            return;
+        }
+        for (GameRankingData entry : response.rankings()) {
+            if (entry != null && entry.user() != null && currentUserId.equals(entry.user().id())) {
+                bestScores.merge(gameType, Math.max(0, entry.score()), Math::max);
+                break;
+            }
+        }
     }
 
     public void create(RoomView view, int minutes) {
@@ -543,5 +583,13 @@ public final class UiSession {
 
     public void changePassword(String currentPassword, String newPassword) {
         liveRequests.changePassword(currentPassword, newPassword);
+    }
+
+    public void saveGameResult(GameType gameType, int score) {
+        liveRequests.saveGameResult(gameType, score);
+    }
+
+    public void requestGameRanking(GameRankingType rankingType, GameType gameType, int limit) {
+        liveRequests.requestGameRanking(rankingType, gameType, limit);
     }
 }
