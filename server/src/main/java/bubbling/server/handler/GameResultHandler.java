@@ -57,7 +57,7 @@ public class GameResultHandler {
         GameRankingResponse payload = new GameRankingResponse(
                 request.rankingType(),
                 rankings,
-                LocalDateTime.now()
+                LocalDateTime.now().toString()
         );
         MessageEnvelope response = new MessageEnvelope(
                 MessageType.GAME_RANKING,
