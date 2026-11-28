@@ -16,16 +16,23 @@ import bubbling.common.dto.chat.ChatEndResponse;
 import bubbling.common.dto.chat.ChatHistoryRequest;
 import bubbling.common.dto.chat.ChatLeaveRequest;
 import bubbling.common.dto.chat.ChatMemberCountEvent;
+import bubbling.common.dto.chat.ChatMemberEvent;
 import bubbling.common.dto.chat.ChatMessageDto;
+import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestDto;
 import bubbling.common.dto.chat.ChatRoomDto;
+import bubbling.common.dto.chat.ChatTypingDto;
+import bubbling.common.dto.game.GameRankingRequest;
+import bubbling.common.dto.game.GameRankingResponse;
 import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.system.OnlineStatusDto;
 import bubbling.common.dto.user.UserDto;
 import bubbling.common.dto.user.UserUpdateRequest;
+import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRequestRole;
 import bubbling.common.enums.ChatRequestStatus;
+import bubbling.common.enums.GameType;
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
@@ -45,24 +52,44 @@ public final class LiveSession {
     private static final String LOGIN_ID_FORMAT = "[A-Za-z][A-Za-z0-9]{7,31}";
     private static final String PASSWORD_FORMAT = "(?=.*[A-Za-z])(?=.*[0-9])(?=.*[!@#$%^&*])[A-Za-z0-9!@#$%^&*]{8,64}";
     private static final String NICKNAME_FORMAT = "[가-힣A-Za-z0-9]+(?:\\s[가-힣A-Za-z0-9]+)*";
+    private static final int AUTHENTICATION_TIMEOUT_MS = 10_000;
+    private static final int PING_INTERVAL_MS = 15_000;
+    private static final int PONG_TIMEOUT_MS = 5_000;
     private final Consumer<MessageEnvelope> transport;
+    private final Runnable closeTransport;
     private final JsonCodec codec = new JsonCodec();
     private final Map<String, String> historyRequests = new HashMap<>();
     private final Map<String, String> leaveRequests = new HashMap<>();
+    private final Map<String, GameType> rankingRequests = new HashMap<>();
     private final Timer authenticationTimeout;
+    private final Timer pingTimer;
+    private final Timer pongTimeout;
     private ApplicationView view;
     private UiSession state;
     private UserDto user;
     private boolean connected;
+    private boolean disconnected;
     private boolean closed;
     private String authId;
+    private String logoutId;
+    private String pingId;
     private MessageType authResult;
     private String opening;
 
     public LiveSession(Consumer<MessageEnvelope> transport) {
-        this.transport = transport;
-        authenticationTimeout = new Timer(10000, event -> disconnected("인증 응답이 없습니다. 앱을 다시 실행해 주세요."));
+        this(transport, () -> {});
+    }
+
+    public LiveSession(Consumer<MessageEnvelope> transport, Runnable closeTransport) {
+        this.transport = Objects.requireNonNull(transport);
+        this.closeTransport = Objects.requireNonNull(closeTransport);
+        authenticationTimeout = new Timer(AUTHENTICATION_TIMEOUT_MS,
+                event -> disconnected("인증 응답이 없습니다. 앱을 다시 실행해 주세요."));
         authenticationTimeout.setRepeats(false);
+        pongTimeout = new Timer(PONG_TIMEOUT_MS, event -> onPongTimeout());
+        pongTimeout.setRepeats(false);
+        pingTimer = new Timer(PING_INTERVAL_MS, event -> sendPing());
+        pingTimer.setInitialDelay(PING_INTERVAL_MS);
     }
 
     public void bind(ApplicationView view, UiSession state) {
@@ -75,6 +102,7 @@ public final class LiveSession {
         registerSystemAndUserHandlers(dispatcher);
         registerBubbleHandlers(dispatcher);
         registerChatHandlers(dispatcher);
+        registerGameHandlers(dispatcher);
     }
 
     private void registerAuthHandlers(ClientMessageDispatcher dispatcher) {
@@ -87,6 +115,17 @@ public final class LiveSession {
             signedIn(dispatcher.decode(message, RegisterResponse.class).user());
         });
         onAuthenticated(dispatcher, PASSWORD_CHANGED, message -> view.passwordChanged());
+        on(dispatcher, LOGOUT_RESULT, message -> {
+            if (logoutId == null || !logoutId.equals(message.requestId())) return;
+            logoutId = null;
+            user = null;
+            opening = null;
+            historyRequests.clear();
+            leaveRequests.clear();
+            rankingRequests.clear();
+            view.resetLiveState();
+            finishAuthentication("");
+        });
         on(dispatcher, ERROR, message -> {
             ExceptionResponse response = dispatcher.decodeError(message);
             String detail = response.message() == null ? "서버에서 요청을 처리하지 못했습니다." : response.message();
@@ -95,12 +134,19 @@ public final class LiveSession {
                 finishAuthentication(detail);
             } else {
                 clearFailedRequest(message);
-                UiErrors.show(view, new ExceptionResponse(response.code(), detail));
+                UiErrors.show(view == null ? null : view.notificationTarget(),
+                        new ExceptionResponse(response.code(), detail));
             }
         });
     }
 
     private void registerSystemAndUserHandlers(ClientMessageDispatcher dispatcher) {
+        on(dispatcher, PONG, message -> {
+            if (pingId != null && pingId.equals(message.requestId())) {
+                pingId = null;
+                pongTimeout.stop();
+            }
+        });
         onAuthenticated(dispatcher, INITIAL_STATE, InitialStateDto.class, snapshot -> {
             state.applyInitialState(snapshot);
             view.setOnline(snapshot.onlineUserCnt());
@@ -123,8 +169,15 @@ public final class LiveSession {
             state.updateReactionCount(reaction.bubbleId(), reaction.reactionCount());
             view.refreshLiveState();
         });
+        onAuthenticated(dispatcher, BUBBLE_DETAIL, BubbleDto.class, bubble -> {
+            state.applyBubble(bubble);
+            view.refreshLiveState();
+        });
         onAuthenticated(dispatcher, BUBBLE_REMOVED, BubbleRemovedEvent.class, event -> {
             state.markBubbleRemoved(event);
+            if (event.status() == BubbleStatus.DELETED) {
+                view.returnFromChat(event.bubbleId());
+            }
             view.refreshLiveState();
             refreshRooms();
         });
@@ -150,9 +203,15 @@ public final class LiveSession {
             view.refreshLiveState();
             refreshRooms();
         });
-        for (MessageType type : new MessageType[] {CHAT_MEMBER_JOINED, CHAT_MEMBER_LEFT}) {
-            onAuthenticated(dispatcher, type, message -> refreshRooms());
-        }
+        onAuthenticated(dispatcher, CHAT_MEMBER_JOINED, ChatMemberEvent.class, event -> {
+            UiSession.Room room = state.chatRoom(event.chatRoomId());
+            if (room != null && !room.view.privateRoom()) {
+                view.memberJoined(event.participant(), room);
+                view.refreshLiveState();
+            }
+            refreshRooms();
+        });
+        onAuthenticated(dispatcher, CHAT_MEMBER_LEFT, message -> refreshRooms());
         onAuthenticated(dispatcher, CHAT_MEMBER_COUNT_CHANGED, ChatMemberCountEvent.class, count -> {
             state.updateMemberCount(count.bubbleId(), count.currentMemberCnt());
             view.refreshLiveState();
@@ -167,6 +226,13 @@ public final class LiveSession {
                 view.refreshLiveState();
             });
         }
+        onAuthenticated(dispatcher, CHAT_REQUEST_LIST, ChatRequestDto[].class, list -> {
+            int added = state.applyRequestList(list);
+            if (added > 0) {
+                view.requestsLoaded(added);
+            }
+            view.refreshLiveState();
+        });
         onAuthenticated(dispatcher, CHAT_HISTORY, message -> {
             String roomId = historyRequests.remove(message.requestId());
             if (roomId == null) return;
@@ -179,6 +245,26 @@ public final class LiveSession {
                 view.chatMessageReceived(room);
             }
             view.refreshLiveState();
+        });
+        onAuthenticated(dispatcher, CHAT_POSITION_CHANGED, message -> {});
+        onAuthenticated(dispatcher, CHAT_POSITION_EVENT, ChatPositionDto.class,
+                position -> view.characterMoved(position));
+        onAuthenticated(dispatcher, CHAT_TYPING_EVENT, ChatTypingDto.class, event -> {
+            state.applyTyping(event);
+            view.refreshLiveState();
+        });
+    }
+
+    private void registerGameHandlers(ClientMessageDispatcher dispatcher) {
+        onAuthenticated(dispatcher, GAME_RESULT_SAVED, message -> view.gameResultSaved());
+        onAuthenticated(dispatcher, GAME_RANKING, message -> {
+            GameRankingResponse response = dispatcher.decode(message, GameRankingResponse.class);
+            GameType gameType = rankingRequests.remove(message.requestId());
+            if (gameType == null && response.rankings() != null && !response.rankings().isEmpty()) {
+                gameType = response.rankings().getFirst().type();
+            }
+            state.applyGameRanking(gameType, response);
+            view.gameRankingLoaded(gameType, response);
         });
     }
 
@@ -213,15 +299,23 @@ public final class LiveSession {
     public void connected() {
         if (closed) return;
         connected = true;
+        disconnected = false;
+        stopPing();
+        pingTimer.restart();
         view.authentication(true, "");
     }
 
     public void disconnected(String detail) {
+        if (closed || disconnected) return;
+        disconnected = true;
         connected = false;
+        stopPing();
         user = null;
+        logoutId = null;
         opening = null;
         historyRequests.clear();
         leaveRequests.clear();
+        rankingRequests.clear();
         view.resetLiveState();
         finishAuthentication(detail);
     }
@@ -271,7 +365,14 @@ public final class LiveSession {
         user = Objects.requireNonNull(account);
         finishAuthentication("");
         view.signedIn(user);
+        send(CHAT_REQUEST_LIST_REQUEST, null);
         refreshRooms();
+    }
+
+    public void logout() {
+        if (!connected || user == null || logoutId != null) return;
+        logoutId = UUID.randomUUID().toString();
+        transmit(LOGOUT, logoutId, null);
     }
 
     private void applyAccount(UserDto account) {
@@ -281,6 +382,10 @@ public final class LiveSession {
 
     public void requestAccount() {
         send(USER_INFO_REQUEST, null);
+    }
+
+    public void requestChatRooms() {
+        send(MY_CHAT_ROOM_LIST_REQUEST, null);
     }
 
     public void updateProfile(ProfileCharacter profile) {
@@ -298,6 +403,9 @@ public final class LiveSession {
         if (type == CHAT_LEAVE && payload instanceof ChatLeaveRequest request) {
             leaveRequests.put(id, request.bubbleId());
         }
+        if (type == GAME_RANKING_REQUEST && payload instanceof GameRankingRequest request) {
+            rankingRequests.put(id, request.gameType());
+        }
         transmit(type, id, payload);
     }
 
@@ -311,14 +419,49 @@ public final class LiveSession {
     public void close() {
         closed = true;
         connected = false;
+        stopPing();
+        logoutId = null;
         leaveRequests.clear();
+        rankingRequests.clear();
         authenticationTimeout.stop();
     }
 
+    void sendPing() {
+        if (closed || !connected || pingId != null) return;
+        String id = UUID.randomUUID().toString();
+        pingId = id;
+        transmit(PING, id, null);
+        if (connected && id.equals(pingId)) {
+            pongTimeout.restart();
+        }
+    }
+
+    void onPongTimeout() {
+        if (closed || !connected || pingId == null) return;
+        closeTransport.run();
+        disconnected("서버 응답이 없습니다. 앱을 다시 실행해 주세요.");
+    }
+
+    boolean isPingScheduled() {
+        return pingTimer.isRunning();
+    }
+
+    boolean isAwaitingPong() {
+        return pongTimeout.isRunning() && pingId != null;
+    }
+
+    private void stopPing() {
+        pingId = null;
+        pingTimer.stop();
+        pongTimeout.stop();
+    }
+
     private void clearFailedRequest(MessageEnvelope message) {
+        if (logoutId != null && logoutId.equals(message.requestId())) logoutId = null;
         if (opening != null && opening.equals(message.requestId())) opening = null;
         historyRequests.remove(message.requestId());
         leaveRequests.remove(message.requestId());
+        rankingRequests.remove(message.requestId());
     }
 
     private void transmit(MessageType type, String id, Object payload) {

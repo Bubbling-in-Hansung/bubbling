@@ -6,9 +6,14 @@ import bubbling.common.enums.ChatRequestRole;
 import bubbling.common.dto.bubble.BubbleDto;
 import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.chat.*;
+import bubbling.common.dto.game.GameRankingData;
+import bubbling.common.dto.game.GameRankingResponse;
 import bubbling.common.dto.system.InitialStateDto;
+import bubbling.common.dto.user.UserDto;
 import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRoomStatus;
+import bubbling.common.enums.GameRankingType;
+import bubbling.common.enums.GameType;
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageType;
 import java.time.*;
@@ -30,6 +35,7 @@ public final class UiSession {
         public boolean joined;
         public boolean ended;
         public boolean removed;
+        public boolean deleted;
         public boolean visited;
         public boolean listed;
         public Instant expiresAt;
@@ -40,6 +46,7 @@ public final class UiSession {
         public final List<Message> messages = Collections.unmodifiableList(messageLog);
         private final Map<String, ChatMessageDto> received = new LinkedHashMap<>();
         private final Map<String, Deque<Message>> recentSpeechByMember = new HashMap<>();
+        private final Set<String> typingMembers = new HashSet<>();
         private Instant lastActivityAt;
         Room(String id, RoomView view) {
             this.id = id;
@@ -111,6 +118,8 @@ public final class UiSession {
     private final Map<String, Instant> retry = new HashMap<>();
     private final Set<String> rejected = new HashSet<>();
     private final Set<String> ownedBubbles = new HashSet<>();
+    private final EnumMap<GameType, Integer> bestScores = new EnumMap<>(GameType.class);
+    private String currentUserId;
     private String recent;
     private int character;
     public UiSession(Clock clock, BiConsumer<MessageType, Object> transport) {
@@ -141,6 +150,7 @@ public final class UiSession {
         room.people = bubble.currentMemberCnt();
         room.reactionCount = Math.max(room.reactionCount, bubble.reactionCount());
         room.removed = bubble.status() != BubbleStatus.ALIVE;
+        room.deleted = bubble.status() == BubbleStatus.DELETED;
         return room;
     }
 
@@ -155,14 +165,25 @@ public final class UiSession {
         room.listed = true;
         room.joined = chat.status() == ChatRoomStatus.ACTIVE && chat.myMemberId() != null;
         room.ended = chat.status() == ChatRoomStatus.ENDED;
+        if (room.ended) {
+            room.typingMembers.clear();
+        } else if (chat.participants() != null) {
+            Set<String> activeIds = new HashSet<>();
+            for (ChatParticipantDto participant : chat.participants()) {
+                activeIds.add(participant.chatMemberId());
+            }
+            room.typingMembers.retainAll(activeIds);
+        }
         return room;
     }
 
     public void applyChatRooms(ChatRoomDto[] conversations) {
         rooms.values().forEach(room -> room.listed = false);
         for (ChatRoomDto conversation : conversations) applyChatRoom(conversation);
-        rooms.values().stream().filter(room -> room.conversation != null && !room.listed)
-                .forEach(room -> room.joined = false);
+        rooms.values().stream().filter(room -> !room.listed).forEach(room -> {
+            room.joined = false;
+            room.visited = false;
+        });
     }
 
     public void markLeft(String id) {
@@ -170,15 +191,22 @@ public final class UiSession {
         if (room != null) {
             room.joined = false;
             room.listed = false;
+            room.visited = false;
         }
     }
 
     public void markEnded(ChatEndResponse response) {
+        for (Request request : requests) {
+            if (request.roomId.equals(response.bubbleId()) && request.status == ChatRequestStatus.PENDING) {
+                request.status = ChatRequestStatus.CANCELLED;
+            }
+        }
         Room room = chatRoom(response.chatRoomId());
         if (room == null) return;
         room.ended = true;
         room.joined = false;
         room.people = 0;
+        room.typingMembers.clear();
     }
 
     public void markBubbleRemoved(BubbleRemovedEvent event) {
@@ -194,8 +222,10 @@ public final class UiSession {
         room.removed = true;
         if (event.status() == BubbleStatus.DELETED) {
             ownedBubbles.remove(event.bubbleId());
+            room.deleted = true;
             room.joined = false;
             room.listed = false;
+            room.visited = false;
             room.ended = room.conversation != null;
             if (room.id.equals(recent)) recent = null;
         }
@@ -228,6 +258,37 @@ public final class UiSession {
         return added;
     }
 
+    public int applyRequestList(ChatRequestDto[] list) {
+        if (list == null) return 0;
+        int addedIncomingPending = 0;
+        for (ChatRequestDto dto : list) {
+            if (dto == null || dto.chatRequestId() == null) continue;
+            var existing = requests.stream()
+                    .filter(item -> item.id.equals(dto.chatRequestId()))
+                    .findFirst()
+                    .orElse(null);
+            if (existing != null) {
+                if (existing.status == ChatRequestStatus.PENDING && dto.status() != null) {
+                    if (dto.status() == ChatRequestStatus.REJECTED) {
+                        reject(existing);
+                    } else {
+                        existing.status = dto.status();
+                    }
+                }
+                continue;
+            }
+            Room targetRoom = rooms.get(dto.bubbleId());
+            if (targetRoom != null && (targetRoom.ended || targetRoom.removed)) {
+                continue;
+            }
+            if (applyRequest(dto) && dto.role() == ChatRequestRole.OWNER
+                    && dto.status() == ChatRequestStatus.PENDING) {
+                addedIncomingPending++;
+            }
+        }
+        return addedIncomingPending;
+    }
+
     public void applyHistory(String roomId, ChatMessageDto[] history) {
         Room room = chatRoom(roomId);
         if (room == null) return;
@@ -244,12 +305,27 @@ public final class UiSession {
     public Room applyMessage(ChatMessageDto message) {
         Room room = chatRoom(message.chatRoomId());
         if (room == null || room.received.putIfAbsent(message.chatMessageId(), message) != null) return null;
+        if (message.senderMemberId() != null) {
+            room.typingMembers.remove(message.senderMemberId());
+        }
         room.recordMessage(messageView(room, message));
         return room;
     }
 
-    private Room chatRoom(String chatId) {
-        return rooms.values().stream().filter(room -> room.conversation != null && room.conversation.chatRoomId().equals(chatId))
+    public void applyTyping(ChatTypingDto event) {
+        if (event == null || event.chatRoomId() == null || event.chatMemberId() == null) return;
+        Room room = chatRoom(event.chatRoomId());
+        if (room == null || room.ended || event.chatMemberId().equals(room.myMemberId)) return;
+        if (event.typing()) {
+            room.typingMembers.add(event.chatMemberId());
+        } else {
+            room.typingMembers.remove(event.chatMemberId());
+        }
+    }
+
+    public Room chatRoom(String chatId) {
+        if (chatId == null) return null;
+        return rooms.values().stream().filter(room -> room.conversation != null && chatId.equals(room.conversation.chatRoomId()))
                 .findFirst().orElse(null);
     }
 
@@ -285,6 +361,8 @@ public final class UiSession {
         requests.clear();
         rejected.clear();
         retry.clear();
+        bestScores.clear();
+        currentUserId = null;
         recent = null;
         character = 0;
     }
@@ -326,6 +404,10 @@ public final class UiSession {
         if (canReact(room)) liveRequests.reactToBubble(room.bubbleId);
     }
 
+    public void requestDetail(Room room) {
+        if (room != null && !room.deleted) liveRequests.requestBubbleDetail(room.bubbleId);
+    }
+
     public List<Request> requests() {
         return List.copyOf(requests);
     }
@@ -348,6 +430,10 @@ public final class UiSession {
             return;
         }
         liveRequests.requestChat(r.bubbleId);
+    }
+
+    public void requestIncomingRequests() {
+        liveRequests.requestChatRequests();
     }
 
     public void decide(Request q, boolean accept) {
@@ -407,6 +493,22 @@ public final class UiSession {
         liveRequests.sendMessage(r.conversation.chatRoomId(), text);
     }
 
+    public void moveCharacter(Room r, int x, int y) {
+        if (r == null || r.conversation == null || r.conversation.myMemberId() == null) return;
+        liveRequests.moveCharacter(r.conversation.chatRoomId(), r.conversation.myMemberId(), x, y);
+    }
+
+    public void setTyping(Room r, boolean typing) {
+        if (r == null || r.ended || !r.joined || r.conversation == null || r.conversation.myMemberId() == null) {
+            return;
+        }
+        liveRequests.sendTyping(r.conversation.chatRoomId(), r.conversation.myMemberId(), typing);
+    }
+
+    public boolean isTyping(Room r, String memberId) {
+        return r != null && !r.ended && memberId != null && r.typingMembers.contains(memberId);
+    }
+
     public List<Message> speech(Room r, String memberId) {
         if (r == null || memberId == null) return List.of();
         Deque<Message> recent = r.recentSpeechByMember.get(memberId);
@@ -432,8 +534,39 @@ public final class UiSession {
         return character;
     }
 
+    public String currentUserId() {
+        return currentUserId;
+    }
+
+    public void applyAccount(UserDto user) {
+        currentUserId = user == null ? null : user.id();
+        applyProfile(user == null ? null : user.profile());
+    }
+
     public void applyProfile(ProfileCharacter profile) {
         character = CharacterChoice.indexOf(profile);
+    }
+
+    public int bestScore(GameType gameType) {
+        return gameType == null ? 0 : bestScores.getOrDefault(gameType, 0);
+    }
+
+    public void recordLocalScore(GameType gameType, int score) {
+        if (gameType == null) return;
+        bestScores.merge(gameType, Math.max(0, score), Math::max);
+    }
+
+    public void applyGameRanking(GameType gameType, GameRankingResponse response) {
+        if (response == null || response.rankingType() != GameRankingType.MAX
+                || gameType == null || currentUserId == null || response.rankings() == null) {
+            return;
+        }
+        for (GameRankingData entry : response.rankings()) {
+            if (entry != null && entry.user() != null && currentUserId.equals(entry.user().id())) {
+                bestScores.merge(gameType, Math.max(0, entry.score()), Math::max);
+                break;
+            }
+        }
     }
 
     public void create(RoomView view, int minutes) {
@@ -450,5 +583,13 @@ public final class UiSession {
 
     public void changePassword(String currentPassword, String newPassword) {
         liveRequests.changePassword(currentPassword, newPassword);
+    }
+
+    public void saveGameResult(GameType gameType, int score) {
+        liveRequests.saveGameResult(gameType, score);
+    }
+
+    public void requestGameRanking(GameRankingType rankingType, GameType gameType, int limit) {
+        liveRequests.requestGameRanking(rankingType, gameType, limit);
     }
 }

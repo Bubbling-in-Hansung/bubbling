@@ -2,14 +2,21 @@ package bubbling.client.ui;
 
 import bubbling.client.LiveSession;
 import bubbling.client.ui.dialog.NotificationCards;
+import bubbling.common.dto.chat.ChatParticipantDto;
+import bubbling.common.dto.chat.ChatPositionDto;
+import bubbling.common.dto.game.GameRankingResponse;
 import bubbling.common.dto.user.UserDto;
+import bubbling.common.enums.GameType;
 import bubbling.client.ui.model.*;
+import bubbling.client.ui.game.GameFrame;
+import bubbling.client.ui.game.GameView;
 import bubbling.client.ui.screen.*;
 import bubbling.client.ui.drawing.CharacterArt;
 import bubbling.client.ui.style.UiFonts;
 import static bubbling.client.ui.model.UiPages.*;
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,11 +41,14 @@ public final class ApplicationView extends JPanel {
     private final CardLayout shellPages = new CardLayout();
     private final JPanel shellDeck = new JPanel(shellPages);
     private String currentPage = "";
-    private JButton homeButton, chatButton;
-    private final Set<String> seenApprovals = new HashSet<>();
-    private final Set<String> unopenedApprovedRooms = new HashSet<>();
+    private JButton homeButton, chatButton, gameButton;
+    private GameFrame gameFrame;
+    private GameView gameView;
+    private Window observedMainWindow;
+    private final Set<String> seenMemberEvents = new HashSet<>();
+    private final Map<String, String> unopenedRoomNotices = new HashMap<>();
+    private final Map<String, Integer> unreadNoticesByRoom = new HashMap<>();
     private final Map<String, Integer> unreadMessagesByRoom = new HashMap<>();
-    private int unreadApprovals;
     private int unreadIncomingRequests;
     private final UiData data;
     private final LiveSession live;
@@ -194,6 +204,19 @@ public final class ApplicationView extends JPanel {
         chatButton.setMaximumSize(new Dimension(58, 56));
         chatButton.setAlignmentX(Component.CENTER_ALIGNMENT);
         top.add(chatButton);
+        top.add(Box.createVerticalStrut(10));
+        gameButton = button("게임", false, this::openGameWindow);
+        gameButton.setIcon(sidebarIcon("game", () -> 0));
+        gameButton.setMargin(new Insets(0, 0, 0, 0));
+        gameButton.setVerticalTextPosition(SwingConstants.BOTTOM);
+        gameButton.setHorizontalTextPosition(SwingConstants.CENTER);
+        gameButton.setFont(font(9, false));
+        gameButton.putClientProperty("flat", true);
+        gameButton.setPreferredSize(new Dimension(58, 56));
+        gameButton.setMaximumSize(new Dimension(58, 56));
+        gameButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+        gameButton.getAccessibleContext().setAccessibleName("게임");
+        top.add(gameButton);
         sidebar.add(top, BorderLayout.NORTH);
         JPanel bottom = column();
         pad(bottom, 10);
@@ -233,23 +256,16 @@ public final class ApplicationView extends JPanel {
         profile.getAccessibleContext().setAccessibleName("마이페이지");
         append(bottom, profile, 8);
         profile.setAlignmentX(Component.CENTER_ALIGNMENT);
-        JButton logout = button("", false, this::leaveApplication);
+        JButton logout = button("", false, live::logout);
         logout.setIcon(icon("logout"));
         logout.putClientProperty("flat", true);
-        String logoutLabel = "로그아웃 및 종료";
+        String logoutLabel = "로그아웃";
         logout.setToolTipText(logoutLabel);
         logout.getAccessibleContext().setAccessibleName(logoutLabel);
         append(bottom, logout, 5);
         logout.setAlignmentX(Component.CENTER_ALIGNMENT);
         sidebar.add(bottom, BorderLayout.SOUTH);
         return sidebar;
-    }
-
-    private void leaveApplication() {
-        Window window = SwingUtilities.getWindowAncestor(this);
-        if (window != null) {
-            window.dispatchEvent(new WindowEvent(window, WindowEvent.WINDOW_CLOSING));
-        }
     }
 
     public void showPage(String page) {
@@ -267,9 +283,12 @@ public final class ApplicationView extends JPanel {
             home.onEnter();
         }
         if (page.equals(CONVERSATIONS)) {
-            unreadApprovals = 0;
+            unreadNoticesByRoom.clear();
             updateChatBadge();
             conversations.onEnter();
+            if (changedPage) {
+                live.requestChatRooms();
+            }
         }
         if (UiPages.usesShell(page)) {
             pages.show(deck, "shell");
@@ -343,6 +362,12 @@ public final class ApplicationView extends JPanel {
         };
     }
 
+    public void requestsLoaded(int count) {
+        if (count <= 0) return;
+        unreadIncomingRequests += count;
+        updateIncomingRequestBadge();
+    }
+
     public void requestReceived(String bubbleId) {
         unreadIncomingRequests++;
         updateIncomingRequestBadge();
@@ -353,12 +378,27 @@ public final class ApplicationView extends JPanel {
     }
 
     public void requestApproved(String approvalId, UiSession.Room room) {
-        if (!seenApprovals.add(approvalId)) return;
-        unopenedApprovedRooms.add(approvalRoomId(room));
-        unreadApprovals++;
-        updateChatBadge();
-        NotificationCards.info(this, "참여 요청이 수락됐어요",
+        recordChatNotice(approvalId, room, "새로 수락된 참여 요청", "참여 요청이 수락됐어요",
                 "‘" + room.view.title() + "’ 대화를 채팅 목록에서 열 수 있어요.");
+    }
+
+    public void memberJoined(ChatParticipantDto participant, UiSession.Room room) {
+        if (participant == null || room == null || room.view.privateRoom()) return;
+        String detail = participant.nickname() == null || participant.nickname().isBlank()
+                ? "‘" + room.view.title() + "’ 대화에 새 참여자가 들어왔어요."
+                : "‘" + room.view.title() + "’ 대화에 " + participant.nickname() + "님이 들어왔어요.";
+        recordChatNotice(participant.chatMemberId(), room, "새 참여자 입장", "새 참여자가 들어왔어요", detail);
+    }
+
+    private void recordChatNotice(String eventId, UiSession.Room room, String rowNotice,
+            String title, String detail) {
+        if (eventId != null && !seenMemberEvents.add(eventId)) return;
+        if (!(currentPage.equals(CHAT) && chat.isShowingRoom(room.id))) {
+            unopenedRoomNotices.put(approvalRoomId(room), rowNotice);
+            unreadNoticesByRoom.merge(room.id, 1, Integer::sum);
+            updateChatBadge();
+        }
+        NotificationCards.info(this, title, detail);
     }
 
     private static String approvalRoomId(UiSession.Room room) {
@@ -372,15 +412,16 @@ public final class ApplicationView extends JPanel {
     }
 
     private String roomNotificationDescription(UiSession.Room room) {
-        boolean hasApproval = unopenedApprovedRooms.contains(approvalRoomId(room));
+        String roomNotice = unopenedRoomNotices.get(approvalRoomId(room));
         Integer unreadMessages = unreadMessagesByRoom.get(room.id);
-        if (unreadMessages == null) return hasApproval ? "새로 수락된 참여 요청" : null;
+        if (unreadMessages == null) return roomNotice;
         String description = "읽지 않은 메시지 " + unreadMessages + "건";
-        return hasApproval ? "새로 수락된 참여 요청, " + description : description;
+        return roomNotice == null ? description : roomNotice + ", " + description;
     }
 
     private int chatBadgeCount() {
-        return unreadApprovals + unreadMessagesByRoom.values().stream().mapToInt(Integer::intValue).sum();
+        return unreadNoticesByRoom.values().stream().mapToInt(Integer::intValue).sum()
+                + unreadMessagesByRoom.values().stream().mapToInt(Integer::intValue).sum();
     }
 
     private void updateChatBadge() {
@@ -402,10 +443,95 @@ public final class ApplicationView extends JPanel {
     }
 
     public void updateAccount(UserDto user) {
-        data.session().applyProfile(user == null ? null : user.profile());
+        data.session().applyAccount(user);
         nickname.setText(user == null ? "" : user.nickname() + "님");
         profileScreen.setAccount(user);
+        if (gameView != null) {
+            gameView.syncProfileCharacter(CharacterChoice.at(data.session().character()));
+        }
         repaint();
+    }
+
+    public void openGameWindow() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            throw new IllegalStateException("Use EDT");
+        }
+        attachMainWindowCloseHook();
+        if (gameFrame != null && gameFrame.isDisplayable() && gameView != null) {
+            gameView.syncProfileCharacter(CharacterChoice.at(data.session().character()));
+            gameView.refreshBestScores();
+            gameFrame.setExtendedState(Frame.NORMAL);
+            gameFrame.setVisible(true);
+            gameFrame.toFront();
+            gameFrame.requestFocus();
+            return;
+        }
+        GameView createdView = new GameView(data.session(), this::closeGameWindow);
+        GameFrame createdFrame = new GameFrame(createdView, SwingUtilities.getWindowAncestor(this));
+        createdFrame.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosed(WindowEvent e) {
+                if (gameView == createdView) {
+                    createdView.stopAllGames();
+                    gameView = null;
+                }
+                if (gameFrame == createdFrame) {
+                    gameFrame = null;
+                }
+            }
+        });
+        gameView = createdView;
+        gameFrame = createdFrame;
+        createdView.refreshBestScores();
+        createdFrame.setVisible(true);
+    }
+
+    public void closeGameWindow() {
+        GameFrame frame = gameFrame;
+        GameView view = gameView;
+        gameFrame = null;
+        gameView = null;
+        if (view != null) {
+            view.stopAllGames();
+        }
+        if (frame != null && frame.isDisplayable()) {
+            frame.dispose();
+        }
+    }
+
+    private void attachMainWindowCloseHook() {
+        Window window = SwingUtilities.getWindowAncestor(this);
+        if (window == null || window == observedMainWindow) return;
+        observedMainWindow = window;
+        window.addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                closeGameWindow();
+            }
+
+            @Override
+            public void windowClosed(WindowEvent e) {
+                closeGameWindow();
+            }
+        });
+    }
+
+    public void gameResultSaved() {
+        if (gameView != null) {
+            gameView.onResultSaved();
+        }
+    }
+
+    public void gameRankingLoaded(GameType gameType, GameRankingResponse response) {
+        if (gameView != null) {
+            gameView.onRankingLoaded(gameType, response);
+        }
+    }
+
+    public Component notificationTarget() {
+        return gameFrame != null && gameFrame.isShowing() && gameFrame.isActive() && gameView != null
+                ? gameView
+                : this;
     }
 
     public void passwordChanged() {
@@ -419,7 +545,8 @@ public final class ApplicationView extends JPanel {
     public void openLiveChat(UiSession.Room room) {
         data.session().visit(room);
         chat.showRoom(room.view);
-        unopenedApprovedRooms.remove(approvalRoomId(room));
+        unopenedRoomNotices.remove(approvalRoomId(room));
+        unreadNoticesByRoom.remove(room.id);
         unreadMessagesByRoom.remove(room.id);
         updateChatBadge();
         showPage(CHAT);
@@ -427,6 +554,12 @@ public final class ApplicationView extends JPanel {
 
     public void returnFromChat(String bubbleId) {
         if (currentPage.equals(CHAT) && chat.isShowingRoom(bubbleId)) showPage(HOME);
+    }
+
+    public void characterMoved(ChatPositionDto position) {
+        if (currentPage.equals(CHAT)) {
+            chat.updateCharacterPosition(position);
+        }
     }
 
     public void refreshLiveState() {
@@ -438,10 +571,11 @@ public final class ApplicationView extends JPanel {
     }
 
     public void resetLiveState() {
-        seenApprovals.clear();
-        unopenedApprovedRooms.clear();
+        closeGameWindow();
+        seenMemberEvents.clear();
+        unopenedRoomNotices.clear();
+        unreadNoticesByRoom.clear();
         unreadMessagesByRoom.clear();
-        unreadApprovals = 0;
         updateChatBadge();
         clearIncomingRequestBadge();
         NotificationCards.clear(this);

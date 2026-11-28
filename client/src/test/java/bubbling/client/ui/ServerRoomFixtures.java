@@ -17,6 +17,6 @@ final class ServerRoomFixtures {
 
     static ChatRoomDto chat(BubbleDto bubble) {
         return new ChatRoomDto("chat-" + bubble.bubbleId(), bubble, ChatRoomStatus.ACTIVE, "me", true,
-                List.of(new ChatParticipantDto("me", "테스터", ProfileCharacter.BUNNY)), bubble.createdAt(), null);
+                List.of(new ChatParticipantDto("me", "테스터", ProfileCharacter.BUNNY)), bubble.createdAt(), null, null);
     }
 }

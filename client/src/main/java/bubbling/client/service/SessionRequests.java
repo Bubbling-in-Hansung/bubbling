@@ -5,19 +5,27 @@ import bubbling.client.ui.model.RoomView;
 import bubbling.common.dto.auth.PasswordChangeRequest;
 import bubbling.common.dto.bubble.BubbleCreateRequest;
 import bubbling.common.dto.bubble.BubbleDeleteRequest;
+import bubbling.common.dto.bubble.BubbleDetailRequest;
 import bubbling.common.dto.bubble.BubbleReactionRequest;
 import bubbling.common.dto.bubble.BubbleUpdateRequest;
 import bubbling.common.dto.chat.ChatEndRequest;
 import bubbling.common.dto.chat.ChatJoinRequest;
 import bubbling.common.dto.chat.ChatLeaveRequest;
 import bubbling.common.dto.chat.ChatMessageRequest;
+import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestCreateRequest;
 import bubbling.common.dto.chat.ChatRequestDecisionRequest;
+import bubbling.common.dto.chat.ChatTypingDto;
+import bubbling.common.dto.game.GameRankingRequest;
+import bubbling.common.dto.game.GameResultRequest;
 import bubbling.common.enums.BubbleCategory;
 import bubbling.common.enums.BubbleMethod;
+import bubbling.common.enums.GameRankingType;
+import bubbling.common.enums.GameType;
 import bubbling.common.protocol.MessageType;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 
 import static bubbling.common.protocol.MessageType.*;
@@ -48,6 +56,10 @@ public final class SessionRequests {
         send.accept(BUBBLE_REACT, new BubbleReactionRequest(bubbleId));
     }
 
+    public void requestBubbleDetail(String bubbleId) {
+        send.accept(BUBBLE_DETAIL_REQUEST, new BubbleDetailRequest(bubbleId));
+    }
+
     public void requestChat(String bubbleId) {
         send.accept(CHAT_REQUEST, new ChatRequestCreateRequest(bubbleId));
     }
@@ -74,6 +86,30 @@ public final class SessionRequests {
 
     public void changePassword(String currentPassword, String newPassword) {
         send.accept(PASSWORD_CHANGE_REQUEST, new PasswordChangeRequest(currentPassword, newPassword));
+    }
+
+    public void requestChatRequests() {
+        send.accept(CHAT_REQUEST_LIST_REQUEST, null);
+    }
+
+    public void moveCharacter(String roomId, String memberId, int x, int y) {
+        send.accept(CHAT_POSITION_REQUEST, new ChatPositionDto(roomId, memberId, x, y));
+    }
+
+    public void sendTyping(String roomId, String memberId, boolean typing) {
+        send.accept(CHAT_TYPING, new ChatTypingDto(roomId, memberId, typing));
+    }
+
+    public void saveGameResult(GameType gameType, int score) {
+        send.accept(GAME_RESULT_REQUEST, new GameResultRequest(
+                Objects.requireNonNull(gameType), Math.max(0, score)));
+    }
+
+    public void requestGameRanking(GameRankingType rankingType, GameType gameType, int limit) {
+        send.accept(GAME_RANKING_REQUEST, new GameRankingRequest(
+                Objects.requireNonNull(rankingType),
+                Objects.requireNonNull(gameType),
+                Math.max(1, limit)));
     }
 
     private static BubbleCategory category(RoomView room) {

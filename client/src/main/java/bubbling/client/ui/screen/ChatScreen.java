@@ -5,10 +5,14 @@ import bubbling.client.ui.dialog.NotificationCards;
 import bubbling.client.ui.dialog.RoomEditor;
 import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.drawing.MessageBubble;
+import bubbling.client.ui.drawing.TypingBubble;
 import bubbling.client.ui.model.*;
 import bubbling.client.ui.style.UiFonts;
 import bubbling.common.dto.chat.ChatParticipantDto;
+import bubbling.common.dto.chat.ChatPositionDto;
 import javax.swing.*;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.text.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -21,6 +25,7 @@ import static bubbling.client.ui.style.Styles.*;
 public final class ChatScreen extends JPanel {
     private static final int SPEECH_REFRESH_MS = 200;
     private static final int ACTIVITY_REFRESH_MS = 1000;
+    private static final int TYPING_IDLE_MS = 3000;
     private static final int MAX_INPUT_WIDTH = 680;
     private static final Color HEADER_LINE = color("d8d5df"), TIMESTAMP_INK = color("938d9b"),
             INPUT_SHADOW = new Color(45, 36, 65, 28), INPUT_FILL = new Color(255, 255, 255, 224),
@@ -37,6 +42,9 @@ public final class ChatScreen extends JPanel {
     private JScrollPane log;
     private final javax.swing.Timer timer;
     private final javax.swing.Timer activityTimer;
+    private final javax.swing.Timer typingIdleTimer;
+    private boolean typingActive;
+    private UiSession.Room typingRoom;
     private RoomScene scene;
     private RoomView room;
     private UiSession.Room current, historyRoom, speechRoom;
@@ -46,7 +54,10 @@ public final class ChatScreen extends JPanel {
     private final JLabel historyHeading = title("", 14), historySubtitle = label("새 메시지가 실시간으로 표시돼요", 11, MUTED),
             emptyHistory = label("아직 대화 기록이 없어요.", 12, MUTED);
     private List<List<UiSession.Message>> visibleSpeech;
+    private List<Boolean> visibleTyping = List.of();
+    private final List<JPanel> speechStacks = new java.util.ArrayList<>();
     private final java.util.Map<UiSession.Message, MessageBubble> speechBubbles = new java.util.IdentityHashMap<>();
+    private final java.util.Map<String, TypingBubble> typingBubbles = new java.util.HashMap<>();
     private static final DateTimeFormatter MESSAGE_TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.systemDefault());
     public ChatScreen(UiData data, Runnable back) {
         super(new BorderLayout());
@@ -57,7 +68,11 @@ public final class ChatScreen extends JPanel {
         header.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, HEADER_LINE),
                 BorderFactory.createEmptyBorder(12, 18, 4, 18)));
         header.setPreferredSize(new Dimension(0, 70));
-        JButton backButton = button("홈으로", false, back);
+        JButton backButton = button("홈으로", false, () -> {
+            stopLocalTyping(true);
+            scene.resetOwnPosition();
+            back.run();
+        });
         backButton.setIcon(icon("chevron-left"));
         backButton.setFont(font(13, true));
         backButton.putClientProperty("flat", true);
@@ -120,7 +135,9 @@ public final class ChatScreen extends JPanel {
             @Override
             public void mouseClicked(MouseEvent event) {
                 if (SwingUtilities.isLeftMouseButton(event) && current != null && current.joined && !current.ended) {
+                    Point scaled = scene.toScaledPosition(event.getPoint());
                     scene.moveOwnCharacter(event.getPoint());
+                    session.moveCharacter(current, scaled.x, scaled.y);
                     layoutSpeech(scene.getWidth(), scene.getHeight());
                     speech.repaint();
                 }
@@ -166,6 +183,7 @@ public final class ChatScreen extends JPanel {
             if (target != null && ActionDialog.confirm(this,
                     "대화를 종료할까요?\n\n모든 참여자의 대화가 끝나며 더 이상 메시지를 보낼 수 없어요.", "종료")
                     && target == current && target.joined && !target.ended) {
+                stopLocalTyping(true);
                 session.end(target);
             }
         });
@@ -173,6 +191,7 @@ public final class ChatScreen extends JPanel {
             UiSession.Room target = current;
             if (target != null && ActionDialog.confirm(this, "대화방에서 나갈까요?", "퇴장")
                     && target == current && target.joined && !target.ended) {
+                stopLocalTyping(true);
                 session.leave(target);
             }
         });
@@ -245,7 +264,26 @@ public final class ChatScreen extends JPanel {
                 }
             }
         });
-        timer = new javax.swing.Timer(SPEECH_REFRESH_MS, e -> renderSpeech());
+        typingIdleTimer = new javax.swing.Timer(TYPING_IDLE_MS, e -> stopLocalTyping(true));
+        typingIdleTimer.setRepeats(false);
+        input.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                onInputChanged();
+            }
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                onInputChanged();
+            }
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                onInputChanged();
+            }
+        });
+        timer = new javax.swing.Timer(SPEECH_REFRESH_MS, e -> {
+            renderSpeech();
+            advanceTypingIndicators();
+        });
         activityTimer = new javax.swing.Timer(ACTIVITY_REFRESH_MS, e -> {
             updateActivityIndicator();
             edit.setEnabled(canEditBubble());
@@ -256,6 +294,7 @@ public final class ChatScreen extends JPanel {
                 timer.start();
                 activityTimer.start();
             } else {
+                stopLocalTyping(true);
                 timer.stop();
                 activityTimer.stop();
             }
@@ -272,7 +311,10 @@ public final class ChatScreen extends JPanel {
         if (next == null) {
             throw new IllegalArgumentException("Unknown room");
         }
-        if (current != next) scene.resetOwnPosition();
+        if (current != next) {
+            stopLocalTyping(true);
+            scene.resetOwnPosition();
+        }
         room = selected;
         current = next;
         input.setText("");
@@ -314,13 +356,61 @@ public final class ChatScreen extends JPanel {
         return current != null && current.bubbleId.equals(bubbleId);
     }
 
+    public void updateCharacterPosition(ChatPositionDto position) {
+        if (position == null || current == null || current.conversation == null
+                || !current.conversation.chatRoomId().equals(position.chatRoomId()) || current.ended) {
+            return;
+        }
+        scene.moveCharacter(position.chatMemberId(), position.x(), position.y());
+        layoutSpeech(scene.getWidth(), scene.getHeight());
+        speech.repaint();
+    }
+
     public void resetLive() {
+        stopLocalTyping(false);
         current = null;
         room = null;
         input.setText("");
+        typingBubbles.clear();
+        visibleTyping = List.of();
         scene.resetOwnPosition();
         scene.showParticipants(List.of(), null);
         refresh();
+    }
+
+    private void onInputChanged() {
+        if (current == null || current.ended || !current.joined) {
+            stopLocalTyping(false);
+            return;
+        }
+        if (input.getText().isBlank()) {
+            stopLocalTyping(true);
+            return;
+        }
+        if (!typingActive || typingRoom != current) {
+            if (typingActive && typingRoom != null && typingRoom != current) {
+                session.setTyping(typingRoom, false);
+            }
+            typingActive = true;
+            typingRoom = current;
+            session.setTyping(current, true);
+        }
+        typingIdleTimer.restart();
+    }
+
+    private void stopLocalTyping(boolean notifyServer) {
+        typingIdleTimer.stop();
+        if (typingActive && notifyServer && typingRoom != null) {
+            session.setTyping(typingRoom, false);
+        }
+        typingActive = false;
+        typingRoom = null;
+    }
+
+    private void advanceTypingIndicators() {
+        for (TypingBubble bubble : typingBubbles.values()) {
+            bubble.tick();
+        }
     }
 
     private void send() {
@@ -334,6 +424,7 @@ public final class ChatScreen extends JPanel {
                     + "줄까지 입력할 수 있어요.");
             return;
         }
+        stopLocalTyping(true);
         session.send(current, input.getText());
         input.setText("");
         refresh();
@@ -430,21 +521,38 @@ public final class ChatScreen extends JPanel {
     }
 
     private void renderSpeech() {
+        List<ChatParticipantDto> participants = List.of();
         List<List<UiSession.Message>> messages = List.of();
+        List<Boolean> typing = List.of();
         if (current != null && current.conversation != null && !current.ended) {
-            messages = current.participants().stream().limit(RoomScene.MAX_VISIBLE_PARTICIPANTS)
+            participants = current.participants().stream().limit(RoomScene.MAX_VISIBLE_PARTICIPANTS).toList();
+            messages = participants.stream()
                     .map(ChatParticipantDto::chatMemberId).map(id -> session.speech(current, id)).toList();
+            typing = participants.stream()
+                    .map(ChatParticipantDto::chatMemberId).map(id -> session.isTyping(current, id)).toList();
         }
-        if (speechRoom == current && messages.equals(visibleSpeech)) {
+        if (speechRoom == current && messages.equals(visibleSpeech) && typing.equals(visibleTyping)) {
             return;
         }
         speechRoom = current;
         visibleSpeech = messages;
+        visibleTyping = typing;
         var visibleMessages = messages.stream().flatMap(List::stream).toList();
         speechBubbles.keySet().removeIf(message -> visibleMessages.stream().noneMatch(value -> value == message));
+        java.util.Set<String> typingMembers = new java.util.HashSet<>();
+        for (int i = 0; i < participants.size(); i++) {
+            if (typing.get(i)) {
+                typingMembers.add(participants.get(i).chatMemberId());
+            }
+        }
+        typingBubbles.keySet().retainAll(typingMembers);
         speech.removeAll();
+        speechStacks.clear();
         if (current != null) {
-            for (var senderMessages : messages) {
+            for (int i = 0; i < participants.size(); i++) {
+                String memberId = participants.get(i).chatMemberId();
+                var senderMessages = messages.get(i);
+                boolean isTyping = typing.get(i);
                 JPanel stack = column();
                 boolean first = true;
                 for (var message : senderMessages) {
@@ -461,6 +569,15 @@ public final class ChatScreen extends JPanel {
                     text.setAlignmentX(Component.CENTER_ALIGNMENT);
                     first = false;
                 }
+                if (isTyping) {
+                    if (!first) {
+                        stack.add(Box.createVerticalStrut(7));
+                    }
+                    TypingBubble indicator = typingBubbles.computeIfAbsent(memberId, id -> new TypingBubble());
+                    stack.add(indicator);
+                    indicator.setAlignmentX(Component.CENTER_ALIGNMENT);
+                }
+                speechStacks.add(stack);
                 speech.add(stack);
             }
         }
@@ -471,32 +588,40 @@ public final class ChatScreen extends JPanel {
 
     private void layoutSpeech(int width, int height) {
         speech.setBounds(0, 0, width, height);
-        for (int i = 0; i < speech.getComponentCount(); i++) {
-            Component stack = speech.getComponent(i);
+        for (int i = 0; i < speechStacks.size(); i++) {
+            JPanel stack = speechStacks.get(i);
             Point head = scene.participantHead(i);
             int below = scene.participantBottom(head) + 8;
             boolean placeBelow = head.y < 95 && height - below > head.y;
-            if (stack instanceof Container container) {
-                int bubbleCount = (int) java.util.Arrays.stream(container.getComponents()).filter(MessageBubble.class::isInstance).count();
-                int space = placeBelow ? height - below : head.y - 20;
-                int budget = Math.max(1, (space - Math.max(0, bubbleCount - 1) * 7) / Math.max(1, bubbleCount));
-                for (Component child : container.getComponents()) {
-                    if (child instanceof MessageBubble bubble) {
-                        bubble.setAvailableHeight(budget);
-                    }
+            int messageCount = (int) java.util.Arrays.stream(stack.getComponents()).filter(MessageBubble.class::isInstance).count();
+            int typingReserve = java.util.Arrays.stream(stack.getComponents())
+                    .filter(TypingBubble.class::isInstance)
+                    .mapToInt(c -> c.getPreferredSize().height + (messageCount > 0 ? 7 : 0))
+                    .sum();
+            int space = Math.max(1, (placeBelow ? height - below : head.y - 20) - typingReserve);
+            int budget = Math.max(1, (space - Math.max(0, messageCount - 1) * 7) / Math.max(1, messageCount));
+            for (Component child : stack.getComponents()) {
+                if (child instanceof MessageBubble bubble) {
+                    bubble.setAvailableHeight(budget);
                 }
             }
             Dimension size = stack.getPreferredSize();
             int x = Math.clamp(head.x - size.width / 2, 0, Math.max(0, width - size.width));
             int y = placeBelow ? below : Math.max(0, head.y - size.height - 10);
             stack.setBounds(x, y, size.width, size.height);
-            if (stack instanceof Container container) {
-                container.doLayout();
-                for (Component child : container.getComponents()) {
-                    if (child instanceof MessageBubble bubble) {
-                        bubble.doLayout();
-                    }
+            stack.doLayout();
+            for (Component child : stack.getComponents()) {
+                if (child instanceof MessageBubble bubble) {
+                    bubble.doLayout();
                 }
+            }
+        }
+        List<Integer> order = scene.paintOrder();
+        int z = 0;
+        for (int j = order.size() - 1; j >= 0; j--) {
+            int idx = order.get(j);
+            if (idx >= 0 && idx < speechStacks.size()) {
+                speech.setComponentZOrder(speechStacks.get(idx), z++);
             }
         }
     }
@@ -614,6 +739,7 @@ public final class ChatScreen extends JPanel {
 
     @Override
     public void removeNotify() {
+        typingIdleTimer.stop();
         timer.stop();
         activityTimer.stop();
         super.removeNotify();
