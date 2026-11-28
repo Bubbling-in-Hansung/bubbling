@@ -51,7 +51,7 @@ public class SearchAverageStrategy implements GameResultSearchStrategy {
                             UserMapper.toDto(latest.getUser()),
                             type,
                             average,
-                            latest.getCreatedAt()
+                            latest.getCreatedAt().toString()
                     );
                 })
                 .sorted(Comparator.comparingInt(GameRankingData::score).reversed())
