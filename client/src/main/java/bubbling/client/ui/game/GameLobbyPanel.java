@@ -2,6 +2,7 @@ package bubbling.client.ui.game;
 
 import bubbling.client.ui.drawing.CharacterArt;
 import bubbling.client.ui.model.CharacterChoice;
+import bubbling.client.ui.model.UiSession;
 import bubbling.common.enums.GameType;
 
 import javax.swing.BorderFactory;
@@ -26,22 +27,26 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.EnumMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import static bubbling.client.ui.style.Styles.*;
 
-/** Game selection screen with entry points to play, check guide, or view ranking status. */
+/** Game selection screen with entry points to play, check guide, or inspect rankings. */
 public final class GameLobbyPanel extends JPanel {
     private static final Color CARD_HOVER = color("fcfaff");
 
+    private final UiSession session;
     private final Consumer<GameType> onStartGame;
     private final Consumer<GameType> onShowGuide;
-    private final Runnable onShowRanking;
+    private final Consumer<GameType> onShowRanking;
     private final Consumer<CharacterChoice> onSelectCharacter;
 
     private final Map<GameType, GameCard> cards = new EnumMap<>(GameType.class);
     private final Map<CharacterChoice, JButton> characterButtons = new EnumMap<>(CharacterChoice.class);
     private final JLabel selectedFavoriteLabel = label("", 11, SUBTLE);
+    private final JLabel dinoBestLabel = label("", 11, PURPLE);
+    private final JLabel catchBestLabel = label("", 11, PURPLE);
     private final JPanel characterPreview = new JPanel() {
         {
             setOpaque(false);
@@ -64,16 +69,20 @@ public final class GameLobbyPanel extends JPanel {
     private GameType selectedGame = GameType.DINOSAUR_RUN;
     private CharacterChoice selectedCharacter = CharacterChoice.BUNNY;
 
-    public GameLobbyPanel(Consumer<GameType> onStartGame,
+    public GameLobbyPanel(UiSession session,
+                          Consumer<GameType> onStartGame,
                           Consumer<GameType> onShowGuide,
-                          Runnable onShowRanking,
+                          Consumer<GameType> onShowRanking,
                           Consumer<CharacterChoice> onSelectCharacter,
                           Runnable onCloseWindow) {
         super(new BorderLayout(0, 18));
+        this.session = Objects.requireNonNull(session);
         this.onStartGame = onStartGame;
         this.onShowGuide = onShowGuide;
         this.onShowRanking = onShowRanking;
         this.onSelectCharacter = onSelectCharacter;
+        dinoBestLabel.setFont(font(11, true));
+        catchBestLabel.setFont(font(11, true));
         setBackground(BG);
         pad(this, 26);
 
@@ -97,7 +106,7 @@ public final class GameLobbyPanel extends JPanel {
 
         JPanel leftActions = panel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         JButton guideButton = button("게임 방법", false, () -> this.onShowGuide.accept(selectedGame));
-        JButton rankingButton = button("랭킹 확인", false, this.onShowRanking);
+        JButton rankingButton = button("랭킹 확인", false, () -> this.onShowRanking.accept(selectedGame));
         leftActions.add(guideButton);
         leftActions.add(rankingButton);
 
@@ -116,6 +125,16 @@ public final class GameLobbyPanel extends JPanel {
 
         selectGame(GameType.DINOSAUR_RUN);
         setSelectedCharacter(CharacterChoice.BUNNY);
+        refreshBestScores();
+    }
+
+    public void refreshBestScores() {
+        dinoBestLabel.setText(bestScoreText(session.bestScore(GameType.DINOSAUR_RUN)));
+        catchBestLabel.setText(bestScoreText(session.bestScore(GameType.CATCH_FAVORITE)));
+    }
+
+    private static String bestScoreText(int score) {
+        return score > 0 ? "내 최고 점수: " + score + "점" : "내 최고 점수: 기록 없음";
     }
 
     public GameType selectedGame() {
@@ -173,6 +192,8 @@ public final class GameLobbyPanel extends JPanel {
         controls.setAlignmentX(Component.LEFT_ALIGNMENT);
         card.body.add(controls);
         card.body.add(Box.createVerticalGlue());
+        dinoBestLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.body.add(dinoBestLabel);
         return card;
     }
 
@@ -210,7 +231,10 @@ public final class GameLobbyPanel extends JPanel {
             picker.add(btn);
         }
         card.body.add(picker);
+        card.body.add(Box.createVerticalStrut(10));
         card.body.add(Box.createVerticalGlue());
+        catchBestLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        card.body.add(catchBestLabel);
         return card;
     }
 
