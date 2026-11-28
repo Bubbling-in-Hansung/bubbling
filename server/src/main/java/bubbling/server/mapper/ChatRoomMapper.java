@@ -26,7 +26,8 @@ public class ChatRoomMapper {
                 room.getCreatedAt().toString(),
                 room.getEndedAt() == null
                         ? null
-                        : room.getEndedAt().toString()
+                        : room.getEndedAt().toString(),
+                room.getMusicUrl()
         );
     }
 }

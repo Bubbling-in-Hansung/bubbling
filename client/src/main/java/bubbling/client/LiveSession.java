@@ -21,6 +21,7 @@ import bubbling.common.dto.chat.ChatMessageDto;
 import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestDto;
 import bubbling.common.dto.chat.ChatRoomDto;
+import bubbling.common.dto.chat.ChatTypingDto;
 import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.system.OnlineStatusDto;
@@ -161,6 +162,10 @@ public final class LiveSession {
             state.updateReactionCount(reaction.bubbleId(), reaction.reactionCount());
             view.refreshLiveState();
         });
+        onAuthenticated(dispatcher, BUBBLE_DETAIL, BubbleDto.class, bubble -> {
+            state.applyBubble(bubble);
+            view.refreshLiveState();
+        });
         onAuthenticated(dispatcher, BUBBLE_REMOVED, BubbleRemovedEvent.class, event -> {
             state.markBubbleRemoved(event);
             if (event.status() == BubbleStatus.DELETED) {
@@ -237,6 +242,10 @@ public final class LiveSession {
         onAuthenticated(dispatcher, CHAT_POSITION_CHANGED, message -> {});
         onAuthenticated(dispatcher, CHAT_POSITION_EVENT, ChatPositionDto.class,
                 position -> view.characterMoved(position));
+        onAuthenticated(dispatcher, CHAT_TYPING_EVENT, ChatTypingDto.class, event -> {
+            state.applyTyping(event);
+            view.refreshLiveState();
+        });
     }
 
     private void onAuthenticated(ClientMessageDispatcher dispatcher, MessageType type,

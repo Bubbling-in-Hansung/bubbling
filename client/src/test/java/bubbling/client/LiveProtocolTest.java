@@ -3,10 +3,14 @@ package bubbling.client;
 import bubbling.client.network.ClientMessageDispatcher;
 import bubbling.client.ui.ApplicationView;
 import bubbling.client.ui.dialog.NotificationCards;
+import bubbling.client.ui.drawing.MessageBubble;
 import bubbling.client.ui.drawing.RoomScene;
+import bubbling.client.ui.drawing.TypingBubble;
 import bubbling.client.ui.model.UiData;
+import bubbling.client.ui.screen.ChatScreen;
 import bubbling.common.codec.JsonCodec;
 import bubbling.common.dto.auth.LoginResponse;
+import bubbling.common.dto.bubble.BubbleDetailRequest;
 import bubbling.common.dto.bubble.BubbleDto;
 import bubbling.common.dto.bubble.BubbleRemovedEvent;
 import bubbling.common.dto.bubble.BubbleUpdateRequest;
@@ -17,6 +21,7 @@ import bubbling.common.dto.chat.ChatParticipantDto;
 import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRoomDto;
 import bubbling.common.dto.chat.ChatRequestDto;
+import bubbling.common.dto.chat.ChatTypingDto;
 import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.user.UserDto;
@@ -32,6 +37,7 @@ import org.junit.jupiter.api.Test;
 
 import javax.swing.JButton;
 import javax.swing.JRootPane;
+import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
 import java.awt.Container;
@@ -300,7 +306,7 @@ class LiveProtocolTest {
                     List.of(
                             new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE),
                             new ChatParticipantDto("peer", "상대방", ProfileCharacter.EXAMPLE)),
-                    owned.createdAt(), null);
+                    owned.createdAt(), null, null);
             dispatcher.dispatch(new MessageEnvelope(MY_CHAT_ROOM_LIST, "list", codec.toPayload(List.of(chatRoom))));
         });
         SwingUtilities.invokeAndWait(() -> {
@@ -448,6 +454,135 @@ class LiveProtocolTest {
         });
     }
 
+    @Test
+    void requestsAndAppliesBubbleDetail() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+            dispatcher.dispatch(new MessageEnvelope(INITIAL_STATE, "init",
+                    codec.toPayload(new InitialStateDto(List.of(bubble("shared")), 1))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            var room = data.session().room("shared");
+            data.session().requestDetail(room);
+            var detailReq = sent.getLast();
+            assertEquals(BUBBLE_DETAIL_REQUEST, detailReq.type());
+            assertEquals(new BubbleDetailRequest("shared"),
+                    codec.fromPayload(detailReq.payload(), BubbleDetailRequest.class));
+
+            var detailed = new BubbleDto("shared", "최신 고민 제목", BubbleCategory.CAREER, BubbleMethod.SOLUTION,
+                    4, 3, true, BubbleStatus.ALIVE, 7, "2026-11-23T00:00:00", "2099-01-02T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(BUBBLE_DETAIL, detailReq.requestId(), codec.toPayload(detailed)));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            var room = data.session().room("shared");
+            assertEquals("최신 고민 제목", room.view.title());
+            assertEquals(3, room.people);
+            assertEquals(7, room.reactionCount);
+            assertEquals(LocalDateTime.parse("2099-01-02T00:00:00").atZone(ZoneId.systemDefault()).toInstant(),
+                    room.expiresAt);
+            live.close();
+        });
+    }
+
+    @Test
+    void syncsTypingStatusAndRendersTypingBubbleBelowSpeechMessages() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.EXAMPLE, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+            var owned = bubble("owned");
+            var chatRoom = new ChatRoomDto("chat-owned", owned, ChatRoomStatus.ACTIVE, "me", true,
+                    List.of(
+                            new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE),
+                            new ChatParticipantDto("peer", "상대방", ProfileCharacter.EXAMPLE)),
+                    owned.createdAt(), null, null);
+            dispatcher.dispatch(new MessageEnvelope(MY_CHAT_ROOM_LIST, "list", codec.toPayload(List.of(chatRoom))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            var room = data.session().room("owned");
+            application.get().enterRoom(room.view);
+            assertEquals("chat", application.get().currentPage());
+
+            ChatScreen chatScreen = findComponent(application.get(), ChatScreen.class);
+            assertNotNull(chatScreen);
+            JTextField input = findComponent(chatScreen, JTextField.class);
+            assertNotNull(input);
+            long beforeTyping = sent.stream().filter(msg -> msg.type() == CHAT_TYPING).count();
+            input.setText("안");
+            input.setText("안녕");
+            input.setText("안녕하세요");
+            var typingSent = sent.stream().filter(msg -> msg.type() == CHAT_TYPING).toList();
+            assertEquals(beforeTyping + 1, typingSent.size());
+            assertEquals(new ChatTypingDto("chat-owned", "me", true),
+                    codec.fromPayload(typingSent.getLast().payload(), ChatTypingDto.class));
+            input.setText("");
+            var afterClear = sent.stream().filter(msg -> msg.type() == CHAT_TYPING).toList();
+            assertEquals(beforeTyping + 2, afterClear.size());
+            assertEquals(new ChatTypingDto("chat-owned", "me", false),
+                    codec.fromPayload(afterClear.getLast().payload(), ChatTypingDto.class));
+
+            String now = LocalDateTime.now().toString();
+            for (int i = 1; i <= 3; i++) {
+                dispatcher.dispatch(new MessageEnvelope(CHAT_MESSAGE, null, codec.toPayload(
+                        new ChatMessageDto("m-" + i, "chat-owned", "peer", "상대방", "메시지 " + i, now))));
+            }
+            dispatcher.dispatch(new MessageEnvelope(CHAT_TYPING_EVENT, null,
+                    codec.toPayload(new ChatTypingDto("chat-owned", "peer", true))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            TypingBubble indicator = findComponent(application.get(), TypingBubble.class);
+            assertNotNull(indicator);
+            Container stack = indicator.getParent();
+            assertNotNull(stack);
+            long messageBubbles = java.util.Arrays.stream(stack.getComponents())
+                    .filter(MessageBubble.class::isInstance).count();
+            assertEquals(3, messageBubbles);
+            assertSame(indicator, stack.getComponent(stack.getComponentCount() - 1));
+
+            String now = LocalDateTime.now().toString();
+            dispatcher.dispatch(new MessageEnvelope(CHAT_MESSAGE, null, codec.toPayload(
+                    new ChatMessageDto("m-4", "chat-owned", "peer", "상대방", "완료 메시지", now))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertNull(findComponent(application.get(), TypingBubble.class));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_TYPING_EVENT, null,
+                    codec.toPayload(new ChatTypingDto("chat-owned", "peer", true))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertNotNull(findComponent(application.get(), TypingBubble.class));
+            dispatcher.dispatch(new MessageEnvelope(CHAT_TYPING_EVENT, null,
+                    codec.toPayload(new ChatTypingDto("chat-owned", "peer", false))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertNull(findComponent(application.get(), TypingBubble.class));
+            live.close();
+        });
+    }
+
     private static JButton findButton(Container root, String text) {
         for (Component child : root.getComponents()) {
             if (child instanceof JButton button && text.equals(button.getText())) return button;
@@ -492,6 +627,6 @@ class LiveProtocolTest {
 
     private static ChatRoomDto chat(BubbleDto bubble, boolean owner) {
         return new ChatRoomDto("chat-" + bubble.bubbleId(), bubble, ChatRoomStatus.ACTIVE, "me", owner,
-                List.of(new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE)), bubble.createdAt(), null);
+                List.of(new ChatParticipantDto("me", "테스터", ProfileCharacter.EXAMPLE)), bubble.createdAt(), null, null);
     }
 }
