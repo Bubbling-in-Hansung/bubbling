@@ -91,6 +91,7 @@ public final class CatchFavoriteGamePanel extends JPanel {
 
     private final JLabel targetLabel = title("", 13);
     private final JLabel targetRuleLabel = label("+10점 · 다른 아이템 -5점", 11, SUBTLE);
+    private final JLabel bestLabel = label("최고 0점", 12, SUBTLE);
     private final JLabel timerLabel = title("30.0초", 14);
     private final JLabel scoreLabel = title("0점", 14);
     private final JButton restartButton;
@@ -148,6 +149,7 @@ public final class CatchFavoriteGamePanel extends JPanel {
     private long elapsedMs;
     private long lastSpawnAtMs;
     private int score;
+    private int bestScore;
     private int hitCount;
     private int missCount;
 
@@ -179,6 +181,7 @@ public final class CatchFavoriteGamePanel extends JPanel {
         hudBar.add(targetGroup, BorderLayout.WEST);
 
         JPanel metrics = panel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
+        metrics.add(bestLabel);
         timerLabel.setForeground(PURPLE);
         metrics.add(timerLabel);
         metrics.add(scoreLabel);
@@ -237,6 +240,16 @@ public final class CatchFavoriteGamePanel extends JPanel {
 
         loop = new Timer(TICK_MS, event -> step());
         setCharacter(CharacterChoice.BUNNY);
+        bestScore = session.bestScore(GameType.CATCH_FAVORITE);
+        updateHud();
+    }
+
+    public void syncBestScore() {
+        int synced = session.bestScore(GameType.CATCH_FAVORITE);
+        if (synced != bestScore) {
+            bestScore = Math.max(synced, running || finished ? bestScore : 0);
+            updateHud();
+        }
     }
 
     public static long spawnIntervalForProgress(double progress) {
@@ -461,6 +474,8 @@ public final class CatchFavoriteGamePanel extends JPanel {
         feedbacks.clear();
         updateCharacterButtonsEnabled(true);
         restartButton.setEnabled(true);
+        bestScore = Math.max(bestScore, score);
+        session.recordLocalScore(GameType.CATCH_FAVORITE, score);
         updateHud();
         if (!resultSubmitted) {
             resultSubmitted = true;
@@ -473,6 +488,7 @@ public final class CatchFavoriteGamePanel extends JPanel {
         timerLabel.setText(String.format("%.1f초", remainingMs / 1000.0));
         timerLabel.setForeground(remainingMs <= 5_000L && running ? BADGE_RED : PURPLE);
         scoreLabel.setText(score + "점");
+        bestLabel.setText("최고 " + bestScore + "점");
     }
 
     private final class PlayBoard extends JPanel {

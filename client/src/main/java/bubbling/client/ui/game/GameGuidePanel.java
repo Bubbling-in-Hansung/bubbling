@@ -126,7 +126,7 @@ public final class GameGuidePanel extends JPanel {
         appendRule(cardPanel, "2. 진행, 밤/낮 전환 및 점수",
                 "달린 거리에 비례해 점수가 올라가고 100점마다 점수가 반짝여요. 700점마다 밤 모드로 전환되어 달과 별이 뜨고, 속도가 빨라지면 다중 선인장과 익룡이 등장해요.");
         appendRule(cardPanel, "3. 게임 종료 및 기록",
-                "장애물에 부딪히면 게임이 종료되고 최종 점수가 서버로 자동 전송돼요. 게임 오버 화면에서 Space 키나 '다시 하기' 버튼으로 바로 재시작할 수 있어요.");
+                "장애물에 부딪히면 게임이 종료되고 최종 점수가 서버로 자동 전송돼요. 게임 오버 화면에서는 '다시 하기' 버튼으로 다시 시작할 수 있어요.");
 
         body.add(cardPanel);
         return body;

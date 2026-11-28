@@ -56,7 +56,6 @@ public final class DinoRunGamePanel extends JPanel {
     private static final int MAX_OBSTACLE_LENGTH = 3;
     private static final int MAX_OBSTACLE_DUPLICATION = 2;
     private static final double CLEAR_TIME_MS = 2000.0;
-    private static final long GAMEOVER_CLEAR_TIME_MS = 750L;
 
     private static final int BOTTOM_PAD = 10;
     private static final int TREX_START_X = 50;
@@ -223,7 +222,6 @@ public final class DinoRunGamePanel extends JPanel {
     private boolean gameOver;
     private boolean resultSubmitted;
     private long lastTickMs;
-    private long crashedAtMs;
 
     private double currentSpeed = START_SPEED;
     private double distanceRan;
@@ -278,14 +276,18 @@ public final class DinoRunGamePanel extends JPanel {
         JPanel rightHud = panel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         rightHud.add(bestLabel);
         rightHud.add(scoreLabel);
-        rightHud.add(button("게임 선택", false, () -> {
+        JButton backButton = button("게임 선택", false, () -> {
             stopGame();
             this.onBackToLobby.run();
-        }));
-        rightHud.add(GameView.exitButton(() -> {
+        });
+        backButton.setFocusable(false);
+        rightHud.add(backButton);
+        JButton exitButton = GameView.exitButton(() -> {
             stopGame();
             onCloseWindow.run();
-        }));
+        });
+        exitButton.setFocusable(false);
+        rightHud.add(exitButton);
         topBar.add(rightHud, BorderLayout.EAST);
         GameFrame.installDragHandle(topBar);
         add(topBar, BorderLayout.NORTH);
@@ -301,8 +303,11 @@ public final class DinoRunGamePanel extends JPanel {
         footer.add(statusLabel, BorderLayout.WEST);
 
         JPanel actions = panel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
-        actions.add(button("랭킹 확인", false, this.onShowRanking));
+        JButton rankingButton = button("랭킹 확인", false, this.onShowRanking);
+        rankingButton.setFocusable(false);
+        actions.add(rankingButton);
         restartButton = button("다시 하기", true, this::startNewRound);
+        restartButton.setFocusable(false);
         restartButton.putClientProperty("gradient", true);
         restartButton.setPreferredSize(new Dimension(118, 38));
         actions.add(Box.createHorizontalStrut(2));
@@ -312,6 +317,17 @@ public final class DinoRunGamePanel extends JPanel {
 
         loop = new Timer(TICK_MS, event -> step());
         installKeyBindings();
+        bestScore = session.bestScore(GameType.DINOSAUR_RUN);
+        updateHud();
+    }
+
+    public void syncBestScore() {
+        int synced = session.bestScore(GameType.DINOSAUR_RUN);
+        if (synced != bestScore) {
+            bestScore = Math.max(synced, running || gameOver ? bestScore : 0);
+            updateHud();
+            canvas.repaint();
+        }
     }
 
     public void startNewRound() {
@@ -357,12 +373,12 @@ public final class DinoRunGamePanel extends JPanel {
         running = true;
         gameOver = false;
         resultSubmitted = false;
-        crashedAtMs = 0L;
         lastTickMs = System.currentTimeMillis();
 
         restartButton.setEnabled(false);
         updateHud();
         statusLabel.setText("Space · ↑ 점프 · ↓ 숙이기");
+        canvas.requestFocusInWindow();
         loop.start();
         canvas.repaint();
     }
@@ -407,14 +423,7 @@ public final class DinoRunGamePanel extends JPanel {
     }
 
     private void onJumpPressed() {
-        if (gameOver) {
-            if (System.currentTimeMillis() - crashedAtMs >= GAMEOVER_CLEAR_TIME_MS) {
-                startNewRound();
-            }
-            return;
-        }
-        if (!running) {
-            startNewRound();
+        if (!running || gameOver) {
             return;
         }
         if (!jumping && !ducking) {
@@ -427,15 +436,15 @@ public final class DinoRunGamePanel extends JPanel {
     }
 
     private void onJumpReleased() {
-        if (!running || !jumping) return;
+        if (!running || gameOver || !jumping) return;
         if (reachedMinHeight && jumpVelocity < TREX_DROP_VELOCITY) {
             jumpVelocity = TREX_DROP_VELOCITY;
         }
     }
 
     private void onDuckPressed() {
-        duckKeyDown = true;
         if (!running || gameOver) return;
+        duckKeyDown = true;
         if (jumping && !speedDrop) {
             speedDrop = true;
             jumpVelocity = 1.0;
@@ -760,9 +769,10 @@ public final class DinoRunGamePanel extends JPanel {
         running = false;
         gameOver = true;
         ducking = false;
+        duckKeyDown = false;
         setTrexState(TrexState.CRASHED);
-        crashedAtMs = System.currentTimeMillis();
         bestScore = Math.max(bestScore, score);
+        session.recordLocalScore(GameType.DINOSAUR_RUN, score);
         updateHud();
         restartButton.setEnabled(true);
         if (!resultSubmitted) {
@@ -780,6 +790,7 @@ public final class DinoRunGamePanel extends JPanel {
         PlayCanvas() {
             setOpaque(true);
             setBackground(Color.WHITE);
+            setFocusable(true);
         }
 
         @Override
