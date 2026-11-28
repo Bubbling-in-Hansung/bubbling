@@ -6,6 +6,12 @@ import bubbling.client.ui.dialog.NotificationCards;
 import bubbling.client.ui.drawing.MessageBubble;
 import bubbling.client.ui.drawing.RoomScene;
 import bubbling.client.ui.drawing.TypingBubble;
+import bubbling.client.ui.game.CatchFavoriteGamePanel;
+import bubbling.client.ui.game.DinoRunGamePanel;
+import bubbling.client.ui.game.DinoSprites;
+import bubbling.client.ui.game.GameGuidePanel;
+import bubbling.client.ui.game.GameLobbyPanel;
+import bubbling.client.ui.game.GameView;
 import bubbling.client.ui.model.UiData;
 import bubbling.client.ui.screen.ChatScreen;
 import bubbling.common.codec.JsonCodec;
@@ -22,6 +28,7 @@ import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRoomDto;
 import bubbling.common.dto.chat.ChatRequestDto;
 import bubbling.common.dto.chat.ChatTypingDto;
+import bubbling.common.dto.game.GameResultRequest;
 import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.user.UserDto;
@@ -31,12 +38,14 @@ import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRoomStatus;
 import bubbling.common.enums.ChatRequestRole;
 import bubbling.common.enums.ChatRequestStatus;
+import bubbling.common.enums.GameType;
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageEnvelope;
 import org.junit.jupiter.api.Test;
 
 import javax.swing.JButton;
 import javax.swing.JRootPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
@@ -45,6 +54,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -581,6 +591,154 @@ class LiveProtocolTest {
             assertNull(findComponent(application.get(), TypingBubble.class));
             live.close();
         });
+    }
+
+    @Test
+    void supportsMiniGameEntryGuideCharacterSwitchAndResultSaving() throws Exception {
+        var sent = new ArrayList<MessageEnvelope>();
+        var codec = new JsonCodec();
+        var dispatcher = new ClientMessageDispatcher();
+        var live = new LiveSession(sent::add);
+        live.registerHandlers(dispatcher);
+        var data = new UiData(live::send);
+        var application = new AtomicReference<ApplicationView>();
+        var gameRoot = new AtomicReference<JRootPane>();
+        var gameViewRef = new AtomicReference<GameView>();
+        var closed = new AtomicBoolean(false);
+
+        SwingUtilities.invokeAndWait(() -> {
+            application.set(new ApplicationView(data, live));
+            live.connected();
+            live.authenticate(false, "tester123", "password", "");
+            String loginId = sent.getLast().requestId();
+            var user = new UserDto("user-1", "tester123", "테스터", ProfileCharacter.FOX, "2026-11-23T00:00:00");
+            dispatcher.dispatch(new MessageEnvelope(LOGIN_RESULT, loginId, codec.toPayload(new LoginResponse(user))));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            assertTrue(DinoSprites.isLoaded());
+            assertNotNull(findButton(application.get(), "게임"));
+
+            var root = new JRootPane();
+            var gameView = new GameView(data.session(), () -> closed.set(true));
+            root.setSize(880, 640);
+            root.setContentPane(gameView);
+            root.doLayout();
+            gameRoot.set(root);
+            gameViewRef.set(gameView);
+
+            GameLobbyPanel lobby = findComponent(gameView, GameLobbyPanel.class);
+            assertNotNull(lobby);
+            assertTrue(lobby.isVisible());
+            assertEquals("여우", lobby.selectedCharacter().label());
+
+            JButton guideButton = findButton(lobby, "게임 방법");
+            JButton rankingButton = findButton(lobby, "랭킹 확인");
+            JButton startButton = findButton(lobby, "게임 시작");
+            JButton lobbyExitButton = findButton(lobby, "게임 종료");
+            assertNotNull(guideButton);
+            assertNotNull(rankingButton);
+            assertNotNull(startButton);
+            assertNotNull(lobbyExitButton);
+
+            rankingButton.doClick();
+            assertTrue(sent.stream().noneMatch(msg -> msg.type() == GAME_RANKING_REQUEST));
+            assertNotNull(findByAccessibleName(root.getLayeredPane(), "요청을 처리하지 못했어요"));
+            assertTrue(containsTextArea(root.getLayeredPane(), "미구현 된 내용입니다."));
+
+            guideButton.doClick();
+            GameGuidePanel guide = findComponent(gameView, GameGuidePanel.class);
+            assertNotNull(guide);
+            assertTrue(guide.isVisible());
+            assertFalse(lobby.isVisible());
+            assertNotNull(findButton(guide, "게임 종료"));
+
+            JButton backToLobby = findButton(guide, "게임 선택으로");
+            assertNotNull(backToLobby);
+            backToLobby.doClick();
+            assertTrue(lobby.isVisible());
+
+            assertEquals(GameType.DINOSAUR_RUN, lobby.selectedGame());
+            startButton.doClick();
+            DinoRunGamePanel dinoPanel = findComponent(gameView, DinoRunGamePanel.class);
+            assertNotNull(dinoPanel);
+            assertTrue(dinoPanel.isVisible());
+            assertTrue(dinoPanel.isRunning());
+            assertNotNull(findButton(dinoPanel, "게임 종료"));
+            JButton exitDino = findButton(dinoPanel, "게임 선택");
+            assertNotNull(exitDino);
+            exitDino.doClick();
+            assertFalse(dinoPanel.isRunning());
+            assertTrue(lobby.isVisible());
+
+            JButton penguinButton = findButton(lobby, "펭귄");
+            assertNotNull(penguinButton);
+            penguinButton.doClick();
+            assertEquals(GameType.CATCH_FAVORITE, lobby.selectedGame());
+            assertEquals("펭귄", lobby.selectedCharacter().label());
+
+            startButton.doClick();
+            CatchFavoriteGamePanel catchPanel = findComponent(gameView, CatchFavoriteGamePanel.class);
+            assertNotNull(catchPanel);
+            assertTrue(catchPanel.isVisible());
+            assertTrue(catchPanel.isRunning());
+            assertNotNull(findButton(catchPanel, "게임 종료"));
+            assertNotNull(findByAccessibleName(catchPanel, "펭귄 ♥ 물고기"));
+
+            assertTrue(CatchFavoriteGamePanel.spawnIntervalForProgress(0.0)
+                    > CatchFavoriteGamePanel.spawnIntervalForProgress(0.5));
+            assertTrue(CatchFavoriteGamePanel.spawnIntervalForProgress(0.5)
+                    > CatchFavoriteGamePanel.spawnIntervalForProgress(1.0));
+            assertTrue(CatchFavoriteGamePanel.maxItemsForProgress(0.0)
+                    < CatchFavoriteGamePanel.maxItemsForProgress(0.5));
+            assertTrue(CatchFavoriteGamePanel.maxItemsForProgress(0.5)
+                    < CatchFavoriteGamePanel.maxItemsForProgress(1.0));
+            assertTrue(CatchFavoriteGamePanel.minLifetimeForProgress(0.0)
+                    > CatchFavoriteGamePanel.minLifetimeForProgress(0.5));
+            assertTrue(CatchFavoriteGamePanel.minLifetimeForProgress(0.5)
+                    > CatchFavoriteGamePanel.minLifetimeForProgress(1.0));
+            assertTrue(CatchFavoriteGamePanel.minLifetimeForProgress(1.0) >= 300L);
+            assertTrue(CatchFavoriteGamePanel.spawnIntervalForProgress(1.0) <= 80L);
+            assertTrue(CatchFavoriteGamePanel.maxItemsForProgress(1.0) >= 30);
+
+            JButton exitToLobby = findButton(catchPanel, "게임 선택");
+            assertNotNull(exitToLobby);
+            exitToLobby.doClick();
+            assertFalse(catchPanel.isRunning());
+            assertTrue(lobby.isVisible());
+
+            assertFalse(closed.get());
+            lobbyExitButton.doClick();
+            assertTrue(closed.get());
+
+            data.session().saveGameResult(GameType.DINOSAUR_RUN, 180);
+            var dinoResult = sent.getLast();
+            assertEquals(GAME_RESULT_REQUEST, dinoResult.type());
+            assertEquals(new GameResultRequest(GameType.DINOSAUR_RUN, 180),
+                    codec.fromPayload(dinoResult.payload(), GameResultRequest.class));
+
+            data.session().saveGameResult(GameType.CATCH_FAVORITE, -10);
+            var clampedResult = sent.getLast();
+            assertEquals(GAME_RESULT_REQUEST, clampedResult.type());
+            assertEquals(new GameResultRequest(GameType.CATCH_FAVORITE, 0),
+                    codec.fromPayload(clampedResult.payload(), GameResultRequest.class));
+
+            dispatcher.dispatch(new MessageEnvelope(GAME_RESULT_SAVED, dinoResult.requestId(), null));
+            gameView.onResultSaved();
+            assertNotNull(findByAccessibleName(root.getLayeredPane(), "점수 저장 완료"));
+        });
+        SwingUtilities.invokeAndWait(() -> {
+            gameViewRef.get().stopAllGames();
+            NotificationCards.clear(gameRoot.get());
+            live.close();
+        });
+    }
+
+    private static boolean containsTextArea(Container root, String text) {
+        for (Component child : root.getComponents()) {
+            if (child instanceof JTextArea area && text.equals(area.getText())) return true;
+            if (child instanceof Container nested && containsTextArea(nested, text)) return true;
+        }
+        return false;
     }
 
     private static JButton findButton(Container root, String text) {
