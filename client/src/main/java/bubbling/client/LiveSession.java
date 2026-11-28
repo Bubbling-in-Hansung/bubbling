@@ -22,6 +22,8 @@ import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestDto;
 import bubbling.common.dto.chat.ChatRoomDto;
 import bubbling.common.dto.chat.ChatTypingDto;
+import bubbling.common.dto.game.GameRankingRequest;
+import bubbling.common.dto.game.GameRankingResponse;
 import bubbling.common.dto.system.ExceptionResponse;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.dto.system.OnlineStatusDto;
@@ -30,6 +32,7 @@ import bubbling.common.dto.user.UserUpdateRequest;
 import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRequestRole;
 import bubbling.common.enums.ChatRequestStatus;
+import bubbling.common.enums.GameType;
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageEnvelope;
 import bubbling.common.protocol.MessageType;
@@ -57,6 +60,7 @@ public final class LiveSession {
     private final JsonCodec codec = new JsonCodec();
     private final Map<String, String> historyRequests = new HashMap<>();
     private final Map<String, String> leaveRequests = new HashMap<>();
+    private final Map<String, GameType> rankingRequests = new HashMap<>();
     private final Timer authenticationTimeout;
     private final Timer pingTimer;
     private final Timer pongTimeout;
@@ -118,6 +122,7 @@ public final class LiveSession {
             opening = null;
             historyRequests.clear();
             leaveRequests.clear();
+            rankingRequests.clear();
             view.resetLiveState();
             finishAuthentication("");
         });
@@ -252,6 +257,15 @@ public final class LiveSession {
 
     private void registerGameHandlers(ClientMessageDispatcher dispatcher) {
         onAuthenticated(dispatcher, GAME_RESULT_SAVED, message -> view.gameResultSaved());
+        onAuthenticated(dispatcher, GAME_RANKING, message -> {
+            GameRankingResponse response = dispatcher.decode(message, GameRankingResponse.class);
+            GameType gameType = rankingRequests.remove(message.requestId());
+            if (gameType == null && response.rankings() != null && !response.rankings().isEmpty()) {
+                gameType = response.rankings().getFirst().type();
+            }
+            state.applyGameRanking(gameType, response);
+            view.gameRankingLoaded(gameType, response);
+        });
     }
 
     private void onAuthenticated(ClientMessageDispatcher dispatcher, MessageType type,
@@ -301,6 +315,7 @@ public final class LiveSession {
         opening = null;
         historyRequests.clear();
         leaveRequests.clear();
+        rankingRequests.clear();
         view.resetLiveState();
         finishAuthentication(detail);
     }
@@ -388,6 +403,9 @@ public final class LiveSession {
         if (type == CHAT_LEAVE && payload instanceof ChatLeaveRequest request) {
             leaveRequests.put(id, request.bubbleId());
         }
+        if (type == GAME_RANKING_REQUEST && payload instanceof GameRankingRequest request) {
+            rankingRequests.put(id, request.gameType());
+        }
         transmit(type, id, payload);
     }
 
@@ -404,6 +422,7 @@ public final class LiveSession {
         stopPing();
         logoutId = null;
         leaveRequests.clear();
+        rankingRequests.clear();
         authenticationTimeout.stop();
     }
 
@@ -442,6 +461,7 @@ public final class LiveSession {
         if (opening != null && opening.equals(message.requestId())) opening = null;
         historyRequests.remove(message.requestId());
         leaveRequests.remove(message.requestId());
+        rankingRequests.remove(message.requestId());
     }
 
     private void transmit(MessageType type, String id, Object payload) {

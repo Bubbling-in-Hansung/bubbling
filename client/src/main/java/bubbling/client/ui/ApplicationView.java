@@ -4,7 +4,9 @@ import bubbling.client.LiveSession;
 import bubbling.client.ui.dialog.NotificationCards;
 import bubbling.common.dto.chat.ChatParticipantDto;
 import bubbling.common.dto.chat.ChatPositionDto;
+import bubbling.common.dto.game.GameRankingResponse;
 import bubbling.common.dto.user.UserDto;
+import bubbling.common.enums.GameType;
 import bubbling.client.ui.model.*;
 import bubbling.client.ui.game.GameFrame;
 import bubbling.client.ui.game.GameView;
@@ -441,7 +443,7 @@ public final class ApplicationView extends JPanel {
     }
 
     public void updateAccount(UserDto user) {
-        data.session().applyProfile(user == null ? null : user.profile());
+        data.session().applyAccount(user);
         nickname.setText(user == null ? "" : user.nickname() + "님");
         profileScreen.setAccount(user);
         if (gameView != null) {
@@ -457,6 +459,7 @@ public final class ApplicationView extends JPanel {
         attachMainWindowCloseHook();
         if (gameFrame != null && gameFrame.isDisplayable() && gameView != null) {
             gameView.syncProfileCharacter(CharacterChoice.at(data.session().character()));
+            gameView.refreshBestScores();
             gameFrame.setExtendedState(Frame.NORMAL);
             gameFrame.setVisible(true);
             gameFrame.toFront();
@@ -479,6 +482,7 @@ public final class ApplicationView extends JPanel {
         });
         gameView = createdView;
         gameFrame = createdFrame;
+        createdView.refreshBestScores();
         createdFrame.setVisible(true);
     }
 
@@ -515,6 +519,12 @@ public final class ApplicationView extends JPanel {
     public void gameResultSaved() {
         if (gameView != null) {
             gameView.onResultSaved();
+        }
+    }
+
+    public void gameRankingLoaded(GameType gameType, GameRankingResponse response) {
+        if (gameView != null) {
+            gameView.onRankingLoaded(gameType, response);
         }
     }
 
