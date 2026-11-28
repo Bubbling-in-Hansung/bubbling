@@ -9,6 +9,7 @@ import bubbling.common.dto.chat.*;
 import bubbling.common.dto.system.InitialStateDto;
 import bubbling.common.enums.BubbleStatus;
 import bubbling.common.enums.ChatRoomStatus;
+import bubbling.common.enums.GameType;
 import bubbling.common.enums.ProfileCharacter;
 import bubbling.common.protocol.MessageType;
 import java.time.*;
@@ -543,5 +544,9 @@ public final class UiSession {
 
     public void changePassword(String currentPassword, String newPassword) {
         liveRequests.changePassword(currentPassword, newPassword);
+    }
+
+    public void saveGameResult(GameType gameType, int score) {
+        liveRequests.saveGameResult(gameType, score);
     }
 }
