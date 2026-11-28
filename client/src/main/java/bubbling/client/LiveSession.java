@@ -98,6 +98,7 @@ public final class LiveSession {
         registerSystemAndUserHandlers(dispatcher);
         registerBubbleHandlers(dispatcher);
         registerChatHandlers(dispatcher);
+        registerGameHandlers(dispatcher);
     }
 
     private void registerAuthHandlers(ClientMessageDispatcher dispatcher) {
@@ -128,7 +129,8 @@ public final class LiveSession {
                 finishAuthentication(detail);
             } else {
                 clearFailedRequest(message);
-                UiErrors.show(view, new ExceptionResponse(response.code(), detail));
+                UiErrors.show(view == null ? null : view.notificationTarget(),
+                        new ExceptionResponse(response.code(), detail));
             }
         });
     }
@@ -246,6 +248,10 @@ public final class LiveSession {
             state.applyTyping(event);
             view.refreshLiveState();
         });
+    }
+
+    private void registerGameHandlers(ClientMessageDispatcher dispatcher) {
+        onAuthenticated(dispatcher, GAME_RESULT_SAVED, message -> view.gameResultSaved());
     }
 
     private void onAuthenticated(ClientMessageDispatcher dispatcher, MessageType type,

@@ -311,6 +311,12 @@ public final class Styles {
                     heart.curveTo(19, 12, 13, 16, 11, 18);
                     heart.closePath();
                     g.fill(heart);
+                } else if (name.equals("game")) {
+                    g.drawRoundRect(2, 6, 18, 11, 7, 7);
+                    g.drawLine(6, 11, 10, 11);
+                    g.drawLine(8, 9, 8, 13);
+                    g.fillOval(13, 9, 2, 2);
+                    g.fillOval(16, 11, 2, 2);
                 } else {
                     g.drawLine(5, 3, 5, 19);
                     g.drawLine(5, 3, 11, 3);
