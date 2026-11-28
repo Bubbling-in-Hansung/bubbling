@@ -16,9 +16,11 @@ import bubbling.common.dto.chat.ChatPositionDto;
 import bubbling.common.dto.chat.ChatRequestCreateRequest;
 import bubbling.common.dto.chat.ChatRequestDecisionRequest;
 import bubbling.common.dto.chat.ChatTypingDto;
+import bubbling.common.dto.game.GameRankingRequest;
 import bubbling.common.dto.game.GameResultRequest;
 import bubbling.common.enums.BubbleCategory;
 import bubbling.common.enums.BubbleMethod;
+import bubbling.common.enums.GameRankingType;
 import bubbling.common.enums.GameType;
 import bubbling.common.protocol.MessageType;
 
@@ -101,6 +103,13 @@ public final class SessionRequests {
     public void saveGameResult(GameType gameType, int score) {
         send.accept(GAME_RESULT_REQUEST, new GameResultRequest(
                 Objects.requireNonNull(gameType), Math.max(0, score)));
+    }
+
+    public void requestGameRanking(GameRankingType rankingType, GameType gameType, int limit) {
+        send.accept(GAME_RANKING_REQUEST, new GameRankingRequest(
+                Objects.requireNonNull(rankingType),
+                Objects.requireNonNull(gameType),
+                Math.max(1, limit)));
     }
 
     private static BubbleCategory category(RoomView room) {
